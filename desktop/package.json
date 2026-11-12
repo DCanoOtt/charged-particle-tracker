@@ -4,6 +4,11 @@
   "version": "0.1.0",
   "description": "SRIM-like multilayer charged-particle Monte Carlo with ENDF-6 reaction data, activation and γ spectra",
   "author": "Daniel Cano Ott <DCanoOtt@users.noreply.github.com>",
+  "homepage": "https://github.com/DCanoOtt/charged-particle-tracker",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DCanoOtt/charged-particle-tracker.git"
+  },
   "main": "main.js",
   "scripts": {
     "prepare-app": "node prepare.js",
@@ -42,7 +47,9 @@
         "AppImage",
         "deb"
       ],
-      "category": "Science"
+      "category": "Science",
+      "maintainer": "Daniel Cano Ott <DCanoOtt@users.noreply.github.com>",
+      "synopsis": "Charged-particle transport and activation simulator"
     }
   }
 }

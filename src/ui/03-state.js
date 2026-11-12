@@ -17,13 +17,15 @@ function defaultState() {
   };
 }
 let S = defaultState();
-// Signature of everything that changes the transport result: when it differs from the one of the run on screen, the results are out of date and are cleared
+// Signature of everything that changes the transport result: when it differs from the one of the run on screen, the results are flagged as out of date
 // (otherwise the ENDF-6 reaction folding and the activation would combine the old tracks with the new layers, beam or physics).
 function resSig() { return JSON.stringify([S.layers.map(l => [l.t, l.tu, l.def]), S.beam, S.phys, [S.sim.seed, S.sim.depthBins, S.sim.depthMax, S.sim.trackCapM]]); }
-function resCheck() {
-  if (typeof RES === 'undefined' || !RES || typeof RUN !== 'undefined' && RUN) return; if (RES.sig === resSig()) return;
-  RES = null; setTimeout(() => { try { renderAll(); const rs = $('#runStat'); if (rs) rs.textContent = 'The setup changed: the previous results were cleared, press Run.'; } catch (e) { } }, 0);
+function resCheck() {                                                      // marks the results on screen as out of date (they stay visible; ENDF folding and activation wait for a new run)
+  if (typeof RES === 'undefined' || !RES || typeof RUN !== 'undefined' && RUN) return; const st = RES.sig !== resSig(); if (st === !!RES.stale) return;
+  RES.stale = st; staleUI(st);
+  setTimeout(() => { try { if (S.tab === 'endf') renderPlots(true); if (typeof actUpdate === 'function') actUpdate(); } catch (e) { } }, 0);
 }
+function staleUI(st) { const b = document.getElementById('staleBar'); if (b) b.hidden = !st; }
 function saveLocal() { try { resCheck(); } catch (e) { } try { if (typeof alibSync === 'function') alibSync(); } catch (e) { }
   try { localStorage.setItem('chargedtracker.v1', JSON.stringify({ S: { layers: S.layers, beam: S.beam, phys: S.phys, sim: S.sim, plots: S.plots, irr: S.irr, tab: S.tab }, USERLIB })); } catch (e) { } }
 function loadLocal() {

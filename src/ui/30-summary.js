@@ -1,6 +1,6 @@
 /* ====== summary ====== */
 function renderSummary() {
-  const box = $('#cSum'); if (!RES) { box.hidden = true; return; }
+  const box = $('#cSum'); if (!RES) { box.hidden = true; staleUI(false); return; }
   const R = RES, N = R.N, e = R.esc, L = R.L; box.hidden = false;
   const cnt = [0, 0, 0, 0]; for (let i = 0; i < N; i++) cnt[R.status[i]]++;
   const zs = []; for (let i = 0; i < N; i++) if (R.status[i] === 0) zs.push(R.endZ[i]);

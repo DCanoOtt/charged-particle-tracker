@@ -14,6 +14,7 @@ PLOTS.endf = {
     const P = PJ(); if (!P) return noData('This tab needs a proton, deuteron, triton, ³He or α particle as the projectile.');
     if (!alibF().size) return noData('Load the cross-section library for ' + P.plural + ' first (left panel “Nuclear reaction data (ENDF-6)”: choose the TENDL2025 folder or ' + P.lib + ', files ' + P.letter + '-Xx000.tendl).');
     if (R.pj !== P.letter) return noData('The results on screen were computed with another projectile — press Run for the ' + P.name + ' beam.');
+    if (R.stale) return noData('The setup (layers, beam or physics) has changed since this run — press Run to update the reaction results.');
     if (!ALIB.data.size || ![...ALIB.data.values()].some(Boolean)) return noData('No cross-section file was found for the isotopes of the target. ' + (ALIB.report && ALIB.report.miss.length ? 'Missing: ' + esc(ALIB.report.miss.join(', ')) + '.' : ''));
     if (!R.Lh) return noData('This run has no flux tally — run the simulation again.');
     const avail = new Set(['sum'].concat(alibChannelList().map(c => String(c.mt))));

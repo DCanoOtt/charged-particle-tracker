@@ -53,7 +53,7 @@ function finishRun(res, pl, secs, partial) {
   const L = res.L; res.layerE = new Float64Array(L); for (let i = 0; i < L; i++) res.layerE[i] = res.lay.depEl[i] + res.lay.depNu[i] + res.lay.depSe[i];
   res.names = S.layers.map(layerName); res.units = S.layers.map(l => l.tu); res.secs = secs;
   res.beamName = beamName(); res.E0nom = pl.cfg.beam.E0; res.rho = S.layers.map(l => { try { return l.def ? matOf(l.def).rho : 0; } catch (e) { return 0; } });
-  RES = res; RES.sig = RUNSIG || resSig(); RES.pj = PJ() ? PJ().letter : ''; $('#runStat').textContent = (partial ? 'Stopped early — results from the first ' : 'Done: ') + res.N.toLocaleString('en') + ' primaries in ' + secs.toFixed(2) + ' s.'; $('#progBar').style.width = partial ? (100 * res.N / pl.cfg.N).toFixed(1) + '%' : '100%';
+  RES = res; RES.sig = RUNSIG || resSig(); staleUI(false); RES.pj = PJ() ? PJ().letter : ''; $('#runStat').textContent = (partial ? 'Stopped early — results from the first ' : 'Done: ') + res.N.toLocaleString('en') + ' primaries in ' + secs.toFixed(2) + ' s.'; $('#progBar').style.width = partial ? (100 * res.N / pl.cfg.N).toFixed(1) + '%' : '100%';
   drawStack(); renderSummary(); renderPlots(true);
 }
 function loadSetupText(txt, msg) {

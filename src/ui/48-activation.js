@@ -48,6 +48,7 @@ async function actCompute(my) {
   if (!R) return msg('Run the simulation first.');
   if (!alibF().size) return msg('Load the cross-section library for ' + P.plural + ' first (left panel “Nuclear reaction data (ENDF-6)”: choose the TENDL2025 folder or ' + P.lib + ', files ' + P.letter + '-Xx000.tendl).');
   if (R.pj !== P.letter) return msg('The results on screen were computed with another projectile — press Run for the ' + P.name + ' beam.');
+  if (R.stale) return msg('The setup (layers, beam or physics) has changed since this run — press Run to update the activation.');
   if (ALIB.busy) return msg('Reading the cross-section files…');
   if (!ALIB.data.size || ![...ALIB.data.values()].some(Boolean)) return msg('No cross-section file was found for the isotopes of the target.');
   if (!R.Lh) return msg('This run has no flux tally — run the simulation again.');

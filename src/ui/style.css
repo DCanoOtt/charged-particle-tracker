@@ -167,6 +167,7 @@ details.cw > :not(summary) { margin-left: 12px; margin-right: 12px; }
 details.cw > .tscroll:last-child, details.cw > details:last-child { margin-bottom: 12px; }
 
 /* ---- visual polish ---- */
+.stalebar { border: 1px solid var(--warn); border-left-width: 4px; background: color-mix(in srgb, var(--warn) 12%, var(--panel)); color: var(--ink); border-radius: 10px; padding: 9px 14px; font-size: 13px; position: sticky; top: 8px; z-index: 5; box-shadow: var(--shadow); }
 body { background: radial-gradient(1100px 380px at 12% -8%, color-mix(in srgb, var(--accent) 13%, transparent), transparent 70%), radial-gradient(900px 340px at 100% 0%, color-mix(in srgb, var(--fc-blue) 8%, transparent), transparent 70%), var(--bg); background-attachment: fixed; background-color: var(--bg); }
 .top { align-items: center; padding-bottom: 14px; margin-bottom: 20px; border-bottom: 1px solid var(--line); }
 .top > div { display: grid; grid-template-columns: auto 1fr; column-gap: 14px; align-items: center; }

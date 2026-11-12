@@ -116,7 +116,8 @@ function gamRender() {
     'γ emitted: ' + fmt(B.emitted / B.live, 4) + ' γ/s  (' + fmt(B.emitted, 4) + ' in the slice)',
     'detected: ' + fmt(B.detected / B.live, 4) + ' counts/s  (' + fmt(B.detected, 4) + ' counts)  ·  mean efficiency ' + (B.emitted > 0 ? fmt(100 * B.detected / B.emitted, 3) + ' %' : '–'),
     'pile-up (τ = ' + fmt(PU.tau * 1e6, 3) + ' µs' + (PU.f > 1 ? ', ' + fmt(PU.f, 3) + ' pulses per full-energy count' : '') + '): pulse rate ' + fmt(PU.n0, 3) + ' → ' + fmt(PU.n1, 3) + ' /s, mean ' + fmt(PU.nbar, 3) + ' /s',
-    '   μ = nτ = ' + fmt(PU.mu, 3) + ' (mean), ' + fmt(PU.mu0, 3) + ' (slice start)  ·  P(pile-up) = 1 − e^(−2μ) = ' + fmt(100 * PU.Pm, 3) + ' % mean, ' + fmt(100 * PU.P0, 3) + ' % at the start  ·  pile-up pairs in the slice: ' + fmt(PU.pairs, 3) + (PU.mumax > 0.1 ? '  ⚠ μ > 0.1: first-order model, not reliable' : ''),
+    '   PILE-UP PROBABILITY = 1 − e^(−2μ) = ' + fmt(100 * PU.Pm, 3) + ' % (mean rate)  ·  ' + fmt(100 * PU.P0, 3) + ' % (slice start)  ·  ' + fmt(100 * PU.Pmax, 3) + ' % (highest rate)  ·  trailing only 1 − e^(−μ) = ' + fmt(100 * PU.Pone, 3) + ' %',
+    '   μ = nτ = ' + fmt(PU.mu, 3) + ' (mean), ' + fmt(PU.mu0, 3) + ' (start)  ·  piled-up pairs in the slice: ' + fmt(PU.pairs, 3) + ' = ' + fmt(100 * PU.pairs / Math.max(PU.nbar * B.live, 1e-300), 3) + ' % of the pulses' + (PU.mumax > 0.1 ? '  ⚠ μ > 0.1: first-order model, not reliable' : ''),
     'decays in the slice: ' + fmt(B.sumD / B.live, 4) + ' Bq (mean)  ·  FWHM ' + (g.fmode === 'sqrt' ? fmt(g.fwhm, 3) + ' keV at 1 MeV, ∝ √E' : fmt(g.fwhm, 3) + ' keV')];
   const o = { series, xlabel: 'Energy (keV, 1 keV per channel)', ylabel: rate ? 'Counts per second per keV' : 'Counts per keV in the slice', title: 'γ spectrum · layer ' + (G.li + 1) + ' · detected', stats, xlog: false, ylog: g.ylog === 'log', xmin: G.xmin, xmax: G.xmax, ymin: G.ymin, ymax: G.ymax };
   const r = renderChart(o), gg = r.geom, zoomed = G.xmin !== '' || G.ymin !== '';

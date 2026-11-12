@@ -7,7 +7,11 @@ function tickLabel(v) { if (v === 0) return '0'; const a = Math.abs(v); if (a >=
 
 /* o: {series:[{name,color,type:'line'|'hist'|'pts',x,y,edges,dash,hidden}], xlog,ylog,xmin,xmax,ymin,ymax,xlabel,ylabel,title,bands:[{x0,x1,label}],H} */
 function renderChart(o) {
-  const W = 900, H = o.H || 440, m = { l: 80, r: 22, t: o.title ? 38 : 16, b: 58 };
+  const W = 900, m = { l: 80, r: 22, t: o.title ? 38 : 16, b: 58 };
+  // statistics: a text band above the axes (never over the data); long lines are wrapped to the width of the plot
+  const stl = []; if (o.stats && o.stats.length) for (const t of o.stats) { let cur = ''; for (const w of String(t).split(/(?<=[ ·,;])/)) { if ((cur + w).length > 128 && cur) { stl.push(cur); cur = '   ' + w; } else cur += w; } if (cur) stl.push(cur); }
+  const stTop = o.title ? 32 : 8, stH = stl.length ? stl.length * 14 + 10 : 0; if (stH) m.t = stTop + stH + 10;
+  const H = (o.H || 440) + (stH ? stH + (stTop - (o.title ? 38 : 16)) + 10 : 0);
   const iw = W - m.l - m.r, ih = H - m.t - m.b;
   const vis = o.series.filter(s => !s.hidden);
   let dx0 = Infinity, dx1 = -Infinity, dy0 = Infinity, dy1 = -Infinity, ypos = Infinity, xpos = Infinity;
@@ -102,9 +106,8 @@ function renderChart(o) {
   g += '<g class="ax">' + ax + '</g>';
   g += '<text class="lab" x="' + (m.l + iw / 2) + '" y="' + (H - 12) + '" text-anchor="middle">' + esc(o.xlabel || '') + '</text>';
   g += '<text class="lab" transform="translate(18,' + (m.t + ih / 2) + ') rotate(-90)" text-anchor="middle">' + esc(o.ylabel || '') + '</text>';
-  if (o.stats && o.stats.length) {                                        // statistics box inside the plot (top left)
-    const wst = Math.min(iw - 20, 14 + 6.4 * Math.max(...o.stats.map(t => t.length)));
-    g += '<rect x="' + (m.l + 6) + '" y="' + (m.t + 5) + '" width="' + wst + '" height="' + (o.stats.length * 15 + 8) + '" fill="var(--bg)" fill-opacity=".82" stroke="var(--line)"/>' + o.stats.map((t, i) => '<text x="' + (m.l + 12) + '" y="' + (m.t + 21 + i * 15) + '" font-size="11.5" fill="var(--ink)">' + esc(t) + '</text>').join('');
+  if (stl.length) {                                                       // statistics band above the plot area
+    g += '<rect x="8" y="' + stTop + '" width="' + (W - 16) + '" height="' + stH + '" rx="5" fill="var(--bg)" stroke="var(--line)"/>' + stl.map((t, i) => '<text x="16" y="' + (stTop + 17 + i * 14) + '" font-size="11.5" fill="var(--ink)" xml:space="preserve">' + esc(t).replace(/ /g, '&#160;') + '</text>').join('');
   }
   if (o.title) g += '<text class="ttl" x="' + (m.l + iw / 2) + '" y="22" text-anchor="middle">' + esc(o.title) + '</text>';
   g += '<line id="xh" y1="' + m.t + '" y2="' + (m.t + ih) + '" stroke="var(--ink2)" stroke-dasharray="3 3" style="display:none"/>';

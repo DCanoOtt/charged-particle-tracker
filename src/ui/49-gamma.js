@@ -1,7 +1,7 @@
 /* ====== gamma-ray spectrum of a time slice (needs ENDF-6 decay data: discrete gamma lines of MF 8 / MT 457) ======
    Decays of every nuclide of the chain in the slice [t1, t2] come from the exact balance  D_i = N_i(t1) − N_i(t2) + R_i·(overlap with the irradiation) + Σ_p b_p→i D_p
    (parents first). Each decay emits the lines of the nuclide with their absolute intensities; 1 keV per channel; Gaussian resolution; detector efficiency. */
-const GAM_DEF = { fwhm: 1.5, fmode: 'const', eff: 1, effMode: 'const', curve: '100 0.05\n300 0.04\n662 0.025\n1332 0.013\n3000 0.006', ylog: 'log', rate: false, top: 8, emax: 0 };
+const GAM_DEF = { fwhm: 1.5, fmode: 'const', eff: 1, effMode: 'const', curve: '100 0.05\n300 0.04\n662 0.025\n1332 0.013\n3000 0.006', ylog: 'log', rate: false, top: 8, emax: 0, tau: 1, ftp: 1, puCurve: false };
 let GAM = null;                                              // state of the open window
 function gamSet() { const s = irrSet(); return (s.gam = Object.assign({}, GAM_DEF, s.gam || {})); }
 
@@ -68,6 +68,32 @@ function gamBuild(sol, prod, Tirr, t1, t2, g) {
   return { nodes, tot, totE, nch, t1e, t2e, live, sumD, emitted, detected };
 }
 
+// ---- pile-up (see the Instructions, section 11.7) ----
+// n = rate of pulses in the detector, τ = pulse width (resolving time): another pulse within ±τ distorts the event.
+//   μ = n·τ;  P(event piled up) = 1 − exp(−2μ)  (two-sided; one-sided 1 − exp(−μ));  pairs per second = n²·τ;
+//   spectrum: S_pu(E) = exp(−2μ)·S(E) + (pairs with both pulses full-energy)·(p ⊛ p)(E), p = S/ΣS, sum of the two energies.
+function gamDetPerDecay(e, eff) { let s = 0; if (e && e.gam) for (const l of e.gam) s += l[1] * Math.max(0, eff(l[0])); return s; }
+function gamPile(B, sol, g) {
+  const eff = gamEffFn(g), f = Math.max(1, +g.ftp || 1), tau = Math.max(0, +g.tau || 0) * 1e-6, dpd = sol.ids.map((id, i) => gamDetPerDecay(sol.info[i], eff));
+  const rateAt = t => { const k = gamNearest(sol, t); let r = 0; for (let i = 0; i < dpd.length; i++) if (dpd[i] > 0) r += sol.act[i][k] * dpd[i]; return r * f; };         // pulses per second at the node nearest to t
+  const nbar = B.detected / B.live * f, n0 = rateAt(B.t1e), n1 = rateAt(B.t2e), nmax = Math.max(n0, n1, nbar);
+  const mu = nbar * tau, mu0 = n0 * tau, mu1 = n1 * tau, mumax = nmax * tau;
+  const pairs = tau * B.live * (n0 * n0 + n0 * n1 + n1 * n1) / 3;                                     // ∫ n²τ dt with n linear between the limits
+  const P = { f, tau, nbar, n0, n1, mu, mu0, mu1, mumax, Pm: 1 - Math.exp(-2 * mu), P0: 1 - Math.exp(-2 * mu0), Pmax: 1 - Math.exp(-2 * mumax), Pone: 1 - Math.exp(-mu), pairs, spec: null, sums: null, note: '' };
+  if (g.puCurve && B.detected > 0 && tau > 0) {
+    const nch = B.nch, p = new Float64Array(nch), idx = []; let mx = 0; for (let c = 0; c < nch; c++) { p[c] = B.tot[c] / B.detected; if (p[c] > mx) mx = p[c]; }
+    for (let c = 0; c < nch; c++) if (p[c] > 1e-6 * mx) idx.push(c);
+    if (idx.length * idx.length > 4e7) P.note = 'the sum spectrum was skipped (too many channels with counts)';
+    else {
+      const nch2 = Math.min(2 * nch, 24000), sums = new Float64Array(nch2), w = pairs / (f * f);
+      for (let a = 0; a < idx.length; a++) { const ia = idx[a], pa = p[ia] * w; for (let b = 0; b < idx.length; b++) { const c = ia + idx[b] + 1; if (c >= nch2) break; sums[c] += pa * p[idx[b]]; } }
+      const k0 = Math.exp(-2 * mu), spec = new Float64Array(nch2); for (let c = 0; c < nch2; c++) spec[c] = (c < nch ? k0 * B.tot[c] : 0) + sums[c];
+      P.sums = sums; P.spec = spec;
+    }
+  }
+  return P;
+}
+
 // ---- window ----
 function gamNum(v) { return v === 0 ? '0' : fmt(v, 4); }
 function gamOpenAt(li, t1, t2) {                              // t in seconds since the start of the irradiation
@@ -83,10 +109,14 @@ function gamRender() {
   const sc = a => rate ? Float64Array.from(a, v => v / div) : a;
   const series = [{ name: 'total (all isotopes)', type: 'hist', edges, y: sc(B.tot), color: 'var(--ink)', w: 1.6 }];
   B.nodes.slice(0, top).forEach((n, k) => series.push({ name: dkNuc(n.id), type: 'hist', edges, y: sc(n.arr), color: scol(k), w: 1.2 }));
+  const PU = gamPile(B, G.sol, g); B.pu = PU;
+  if (PU.spec) { const e2 = new Float64Array(PU.spec.length + 1); for (let c = 0; c < e2.length; c++) e2[c] = c; series.push({ name: 'total with pile-up', type: 'hist', edges: e2, y: sc(PU.spec), color: 'var(--bad)', w: 1.4 }); series.push({ name: 'pile-up sum pulses only', type: 'hist', edges: e2, y: sc(PU.sums), color: 'var(--warn)', w: 1.2 }); }
   series.forEach(se => { se.hidden = !!G.hidden[se.name]; });
   const stats = ['slice ' + actTime(B.t1e) + ' – ' + actTime(B.t2e) + ' (live time ' + actTime(B.live) + '), layer ' + (G.li + 1),
     'γ emitted: ' + fmt(B.emitted / B.live, 4) + ' γ/s  (' + fmt(B.emitted, 4) + ' in the slice)',
     'detected: ' + fmt(B.detected / B.live, 4) + ' counts/s  (' + fmt(B.detected, 4) + ' counts)  ·  mean efficiency ' + (B.emitted > 0 ? fmt(100 * B.detected / B.emitted, 3) + ' %' : '–'),
+    'pile-up (τ = ' + fmt(PU.tau * 1e6, 3) + ' µs' + (PU.f > 1 ? ', ' + fmt(PU.f, 3) + ' pulses per full-energy count' : '') + '): pulse rate ' + fmt(PU.n0, 3) + ' → ' + fmt(PU.n1, 3) + ' /s, mean ' + fmt(PU.nbar, 3) + ' /s',
+    '   μ = nτ = ' + fmt(PU.mu, 3) + ' (mean), ' + fmt(PU.mu0, 3) + ' (slice start)  ·  P(pile-up) = 1 − e^(−2μ) = ' + fmt(100 * PU.Pm, 3) + ' % mean, ' + fmt(100 * PU.P0, 3) + ' % at the start  ·  pile-up pairs in the slice: ' + fmt(PU.pairs, 3) + (PU.mumax > 0.1 ? '  ⚠ μ > 0.1: first-order model, not reliable' : ''),
     'decays in the slice: ' + fmt(B.sumD / B.live, 4) + ' Bq (mean)  ·  FWHM ' + (g.fmode === 'sqrt' ? fmt(g.fwhm, 3) + ' keV at 1 MeV, ∝ √E' : fmt(g.fwhm, 3) + ' keV')];
   const o = { series, xlabel: 'Energy (keV, 1 keV per channel)', ylabel: rate ? 'Counts per second per keV' : 'Counts per keV in the slice', title: 'γ spectrum · layer ' + (G.li + 1) + ' · detected', stats, xlog: false, ylog: g.ylog === 'log', xmin: G.xmin, xmax: G.xmax, ymin: G.ymin, ymax: G.ymax };
   const r = renderChart(o), gg = r.geom, zoomed = G.xmin !== '' || G.ymin !== '';
@@ -99,7 +129,7 @@ function gamRender() {
     '<div class="mgrid">' + fld('Slice start (s)', '<input type="number" data-gt="t1" step="any" value="' + +(+B.t1e).toPrecision(8) + '" min="0">') + fld('Slice end (s)', '<input type="number" data-gt="t2" step="any" value="' + +(+B.t2e).toPrecision(8) + '" min="0">') +
     fld('Energy resolution (Gaussian), FWHM in keV', inp('fwhm', 'min="0"')) + fld('FWHM model', sel('fmode', [['const', 'constant'], ['sqrt', 'FWHM given at 1 MeV, ∝ √E']])) +
     fld('Detector efficiency', sel('effMode', [['const', 'constant'], ['curve', 'curve ε(E)']])) + (g.effMode === 'curve' ? '' : fld('Constant efficiency (0 – 1)', inp('eff', 'min="0" step="any"'))) +
-    fld('Y axis', sel('ylog', [['log', 'logarithmic'], ['lin', 'linear']])) + fld('Y units', sel('rate', [['false', 'counts per keV'], ['true', 'counts per second per keV']])) + fld('Isotopes in the plot', inp('top', 'min="1" max="30" step="1"')) +
+    fld('Pulse width τ (µs), pile-up window ±τ', inp('tau', 'min="0"')) + fld('Pulses per full-energy count (total/peak ≥ 1)', inp('ftp', 'min="1"')) + fld('Pile-up spectrum', sel('puCurve', [['false', 'only probabilities'], ['true', 'add the pile-up spectrum']])) + fld('Y axis', sel('ylog', [['log', 'logarithmic'], ['lin', 'linear']])) + fld('Y units', sel('rate', [['false', 'counts per keV'], ['true', 'counts per second per keV']])) + fld('Isotopes in the plot', inp('top', 'min="1" max="30" step="1"')) +
     (g.effMode === 'curve' ? '<label class="fld" style="grid-column:1/-1"><span>Efficiency curve: one pair “energy in keV, efficiency” per line (log-log interpolation, constant outside the range)</span><textarea data-gk="curve" rows="5" spellcheck="false" style="font-family:var(--font-mono);width:100%">' + esc(g.curve) + '</textarea></label>' : '') + '</div>' +
     '<div class="btns"><button class="btn sm" data-greset' + (zoomed ? '' : ' disabled') + '>Reset zoom</button><span class="hint">Drag a box to zoom · double-click resets · click a legend entry to show/hide an isotope</span></div>' +
     '<div class="chart">' + r.svg + '</div><div class="legend">' + series.map(se => '<button data-gleg="' + esc(se.name) + '" class="' + (se.hidden ? 'off' : '') + '"><i style="background:' + se.color + '"></i>' + esc(se.name) + '</button>').join('') + '</div>' +
@@ -133,8 +163,8 @@ function gamCtx() {                                           // chart context o
   return { o: G.o, geom: G.geom, svg: div.querySelector('svg'), base: 'cpt_gamma_layer' + (G.li + 1) + '_' + Math.round(G.B.t1e) + 's_' + Math.round(G.B.t2e) + 's', key: 'gam' };
 }
 function gamCsvSpectrum() {
-  const B = GAM.B, ns = B.nodes.filter(n => n.de > 0); let t = '# gamma spectrum, layer ' + (GAM.li + 1) + ', slice ' + B.t1e + ' - ' + B.t2e + ' s; detected counts per 1 keV channel in the slice (efficiency and resolution applied)\nchannel_low_keV,total_detected,total_emitted_with_resolution,' + ns.map(n => dkNuc(n.id)).join(',') + '\n';
-  for (let c = 0; c < B.nch; c++) t += c + ',' + B.tot[c] + ',' + B.totE[c] + (ns.length ? ',' + ns.map(n => n.arr[c]).join(',') : '') + '\n';
+  const B = GAM.B, ns = B.nodes.filter(n => n.de > 0); let t = '# gamma spectrum, layer ' + (GAM.li + 1) + ', slice ' + B.t1e + ' - ' + B.t2e + ' s; detected counts per 1 keV channel in the slice (efficiency and resolution applied)\nchannel_low_keV,total_detected,total_emitted_with_resolution,' + (B.pu && B.pu.spec ? 'total_with_pileup,pileup_sum_pulses,' : '') + ns.map(n => dkNuc(n.id)).join(',') + '\n';
+  for (let c = 0, nr = B.pu && B.pu.spec ? B.pu.spec.length : B.nch; c < nr; c++) t += c + ',' + (B.tot[c] || 0) + ',' + (B.totE[c] || 0) + (B.pu && B.pu.spec ? ',' + B.pu.spec[c] + ',' + B.pu.sums[c] : '') + (ns.length ? ',' + ns.map(n => n.arr[c] || 0).join(',') : '') + '\n';
   return t;
 }
 function gamCsvTable() {
@@ -159,7 +189,7 @@ document.addEventListener('click', async ev => {
 });
 document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && $('#gamWin') && !$('#gamWin').hidden) $('#gamWin').hidden = true; });
 document.addEventListener('change', ev => {
-  const e = ev.target.closest && ev.target.closest('#gamWin [data-gk]'); if (e && GAM) { const g = gamSet(), k = e.dataset.gk; g[k] = k === 'rate' ? e.value === 'true' : (e.type === 'number' ? +e.value : e.value); if (k === 'ylog') { GAM.ymin = GAM.ymax = ''; } saveLocal(); gamRender(); return; }
+  const e = ev.target.closest && ev.target.closest('#gamWin [data-gk]'); if (e && GAM) { const g = gamSet(), k = e.dataset.gk; g[k] = (k === 'rate' || k === 'puCurve') ? e.value === 'true' : (e.type === 'number' ? +e.value : e.value); if (k === 'ylog') { GAM.ymin = GAM.ymax = ''; } saveLocal(); gamRender(); return; }
   const t = ev.target.closest && ev.target.closest('#gamWin [data-gt]'); if (t && GAM) {
     const a = +$('#gamWin [data-gt=t1]').value, b2 = +$('#gamWin [data-gt=t2]').value; if (isFinite(a) && isFinite(b2) && b2 > a && a >= 0) gamOpenAt(GAM.li, a, b2);
   }

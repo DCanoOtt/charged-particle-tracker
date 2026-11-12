@@ -143,7 +143,7 @@ function gamCsvTable() {
   return t + '# total,,' + B.sumD + ',,' + B.emitted + ',' + B.emitted / B.live + ',' + B.detected + ',' + B.detected / B.live + '\n';
 }
 document.addEventListener('click', async ev => {
-  if (ev.target.closest('[data-gclose]') || (ev.target.id === 'gamWin')) { $('#gamWin').hidden = true; return; }
+  if (ev.target.closest('[data-gclose]') || (ev.target.id === 'gamWin' && _mdownId === 'gamWin')) { $('#gamWin').hidden = true; return; }
   const b = ev.target.closest('[data-gsave]'); if (b && GAM) {
     const k = b.dataset.gsave, m = $('#gamMsg'); if (m) m.textContent = 'Preparing…';
     try {

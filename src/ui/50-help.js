@@ -117,6 +117,6 @@ document.getElementById('help').innerHTML = HELP_HTML;
 document.addEventListener('click', ev => { const g = ev.target.closest('[data-goto]'); if (!g) return; ev.preventDefault(); const t = document.getElementById(g.dataset.goto); if (t) t.scrollIntoView({ block: 'start' }); });
 document.addEventListener('click', ev => {
   if (ev.target.id === 'helpBtn') { $('#help').hidden = false; $('#help .mbox').scrollTop = 0; $('#help').scrollTop = 0; }
-  else if (ev.target.closest('[data-help="close"]') || ev.target.id === 'help') $('#help').hidden = true;
+  else if (ev.target.closest('[data-help="close"]') || (ev.target.id === 'help' && _mdownId === 'help')) $('#help').hidden = true;
 });
 document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && !$('#help').hidden) $('#help').hidden = true; });

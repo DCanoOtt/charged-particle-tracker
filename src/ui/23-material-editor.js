@@ -10,7 +10,8 @@ function openModal(i) {
 // the window closes on a click on the dark backdrop only when the mouse was pressed AND released there:
 // selecting text in a field and letting go outside the window must not close it
 let _mdownOnBackdrop = false;
-document.addEventListener('mousedown', ev => { _mdownOnBackdrop = ev.target.id === 'modal'; }, true);
+let _mdownId = '';                                                         // a click closes a window only if the mouse button also went down on the backdrop (selecting text by dragging out of a box must not close it)
+document.addEventListener('mousedown', ev => { _mdownId = ev.target.id || ''; _mdownOnBackdrop = ev.target.id === 'modal'; }, true);
 function closeModal() { $('#modal').hidden = true; M = null; }
 function normRows(d) { d.rows = d.rows || []; return d; }
 const ELNAMES = 'Hydrogen Helium Lithium Beryllium Boron Carbon Nitrogen Oxygen Fluorine Neon Sodium Magnesium Aluminium Silicon Phosphorus Sulfur Chlorine Argon Potassium Calcium Scandium Titanium Vanadium Chromium Manganese Iron Cobalt Nickel Copper Zinc Gallium Germanium Arsenic Selenium Bromine Krypton Rubidium Strontium Yttrium Zirconium Niobium Molybdenum Technetium Ruthenium Rhodium Palladium Silver Cadmium Indium Tin Antimony Tellurium Iodine Xenon Caesium Barium Lanthanum Cerium Praseodymium Neodymium Promethium Samarium Europium Gadolinium Terbium Dysprosium Holmium Erbium Thulium Ytterbium Lutetium Hafnium Tantalum Tungsten Rhenium Osmium Iridium Platinum Gold Mercury Thallium Lead Bismuth Polonium Astatine Radon Francium Radium Actinium Thorium Protactinium Uranium Neptunium Plutonium Americium Curium Berkelium Californium Einsteinium Fermium Mendelevium Nobelium Lawrencium'.split(' ');   // English element names, index = Z-1

@@ -259,6 +259,29 @@ with sync_playwright() as p:
     pg.locator('#gamWin .mbox').screenshot(path='/tmp/gam.png')
     check('pile-up: curves in the legend', 'total with pile-up' in ps['leg'] and 'pile-up sum pulses only' in ps['leg'], ps['leg'])
     check('γ spectrum can be saved as CSV (1 keV channels)', open(dg.value.path()).read().startswith('# gamma spectrum'))
+    # Ge detector model: third efficiency option, own input boxes, curves, simulated spectrum
+    pg.select_option('#gamWin [data-gk=effMode]', 'ge'); pg.wait_for_timeout(600)
+    ge = pg.evaluate("""(()=>{const w=document.querySelector('#gamWin'), g=gamSet(); const f=(d)=>geEff(1332.5, geP(Object.assign({},g,{geDist:d})));
+      const a=f(50), b=f(250), c=geEff(661.7, geP(g)), c0=geEff(661.7, geP(Object.assign({},g,{geScale:2})));
+      const S=GAM.sim; let sp=0, sc=0, sd=0; for(let i=0;i<S.S.peaks.length;i++){sp+=S.S.peaks[i]; sc+=S.S.cont[i]; sd+=S.S.dbl[i];}
+      return {boxes:['geD','geL','geDist','geGap','geDead','geWin','geScale'].every(k=>w.querySelector('[data-gk='+k+']')), noconst:!w.querySelector('[data-gk=eff]'), nocurve:!w.querySelector('textarea[data-gk=curve]'),
+        dist:a.peak>b.peak, tot:c.tot>=c.peak&&c.peak>0, scale:Math.abs(c0.peak/c.peak-2)<1e-9, charts:!!w.querySelector('#geEffChart svg')&&!!w.querySelector('#geSimChart svg'), sp, sc, sd,
+        det:GAM.B.detected, ftp:GAM.B.pu.f, rel:geRelEff(g)}})()""")
+    check('Ge model: its input boxes appear and the constant/curve boxes disappear', ge['boxes'] and ge['noconst'] and ge['nocurve'], ge)
+    check('Ge model: efficiency falls with distance, ε_tot ≥ ε_peak, scale factor is linear', ge['dist'] and ge['tot'] and ge['scale'], ge)
+    check('Ge model: curves and simulated spectrum are shown; the peaks of the simulation equal the detected counts; continuum present', ge['charts'] and abs(ge['sp']/ge['det']-1) < 1e-3 and ge['sc'] > 0 and ge['sd'] >= 0, ge)
+    check('Ge model: pulses per full-energy count from ε_tot/ε_peak (> 1) and a realistic relative efficiency', ge['ftp'] > 1 and 3 < ge['rel'] < 100, ge)
+    pg.locator('#gamWin .mbox').evaluate("e=>e.scrollTop=0"); pg.locator('#gamWin .mbox').screenshot(path='/tmp/ge1.png'); pg.locator('#geSimChart').scroll_into_view_if_needed(); pg.wait_for_timeout(300); pg.locator('#gamWin .mbox').screenshot(path='/tmp/ge2.png')
+    pg.locator('#geEffChart').screenshot(path='/tmp/geeff.png')
+    pg.click('[data-gall=eff][data-gstate=off]'); pg.wait_for_timeout(400)
+    lg = pg.evaluate("""(()=>{const w=document.querySelector('#gamWin'); return {eff:[...w.querySelectorAll('[data-gleg]')].filter(b=>/ε_/.test(b.textContent)).every(b=>b.classList.contains('off')), n:w.querySelectorAll('[data-gall]').length, err:!!w.querySelector('#geEffChart svg')}})()""")
+    pg.click('[data-gall=eff][data-gstate=on]'); pg.select_option('#gamWin [data-gyl=sim]', 'lin'); pg.wait_for_timeout(400)
+    pg.click('[data-gleg="full-energy peaks"]'); pg.click('[data-gall=main][data-gstate=off]'); pg.wait_for_timeout(400)
+    lg2 = pg.evaluate("""(()=>{const w=document.querySelector('#gamWin'); return {lin:GAM.yl.sim==='lin', main:GAM.names.main.every(n=>GAM.hidden[n]), peaks:!!GAM.hidden['full-energy peaks'], svgs:w.querySelectorAll('svg').length}})()""")
+    check('legends: unselect all / select all in every plot, per-plot linear/log Y axis', lg['eff'] and lg['n'] == 6 and lg2['lin'] and lg2['main'] and lg2['peaks'] and lg2['svgs'] >= 3, [lg, lg2])
+    pg.click('[data-gall=main][data-gstate=on]'); pg.click('[data-gall=sim][data-gstate=on]')
+    pg.select_option('#gamWin [data-gk=effMode]', 'curve'); pg.wait_for_timeout(500)
+    check('switching back to the curve model shows its textarea and hides the Ge boxes', pg.evaluate("!!document.querySelector('#gamWin textarea[data-gk=curve]') && !document.querySelector('#gamWin [data-gk=geD]')"))
     pg.click('[data-gclose]'); check('γ window closes', pg.evaluate("document.querySelector('#gamWin').hidden"))
     pg.evaluate("()=>{const s=irrSet(); s.src='int'; s.qty='act'; DEC.map=new Map(); DEC.nuc=0; document.querySelector('#cAct').dataset.key=''; actRender()}"); pg.wait_for_timeout(2500)
     pg.evaluate("()=>{irrSet().qty='num';irrSet().top=12;document.querySelector('#cAct').dataset.key='';actRender()}"); pg.wait_for_timeout(3000)

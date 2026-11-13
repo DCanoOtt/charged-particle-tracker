@@ -1,7 +1,7 @@
 /* ====== gamma-ray spectrum of a time slice (needs ENDF-6 decay data: discrete gamma lines of MF 8 / MT 457) ======
    Decays of every nuclide of the chain in the slice [t1, t2] come from the exact balance  D_i = N_i(t1) − N_i(t2) + R_i·(overlap with the irradiation) + Σ_p b_p→i D_p
    (parents first). Each decay emits the lines of the nuclide with their absolute intensities; 1 keV per channel; Gaussian resolution; detector efficiency. */
-const GAM_DEF = { fwhm: 1.5, fmode: 'const', eff: 1, effMode: 'const', curve: '100 0.05\n300 0.04\n662 0.025\n1332 0.013\n3000 0.006', ylog: 'log', rate: false, top: 8, emax: 0, tau: 1, ftp: 1, puCurve: false };
+const GAM_DEF = { fwhm: 1.5, fmode: 'const', eff: 1, effMode: 'const', curve: '100 0.05\n300 0.04\n662 0.025\n1332 0.013\n3000 0.006', ylog: 'log', rate: false, top: 8, emax: 0, tau: 1, ftp: 1, puCurve: false, ftpMode: 'auto', geD: 60, geL: 60, geDist: 25, geGap: 5, geDead: 0.7, geWin: 1, geScale: 1 };
 let GAM = null;                                              // state of the open window
 function gamSet() { const s = irrSet(); return (s.gam = Object.assign({}, GAM_DEF, s.gam || {})); }
 
@@ -16,7 +16,9 @@ function gamCurve(text) {                                     // "energy_keV eff
   const pts = []; for (const ln of String(text || '').split(/\r?\n/)) { const a = ln.trim().split(/[\s,;]+/).map(Number); if (a.length >= 2 && a[0] > 0 && a[1] >= 0 && isFinite(a[0]) && isFinite(a[1])) pts.push([a[0], a[1]]); }
   return pts.sort((a, b) => a[0] - b[0]);
 }
+function gamEffTotFn(g) { return g.effMode === 'ge' ? (E => geEffC(E, g).tot) : gamEffFn(g); }
 function gamEffFn(g) {                                        // E (keV) → efficiency (0..1+): constant, or log-log interpolation of the curve (constant outside)
+  if (g.effMode === 'ge') return E => geEffC(E, g).peak;
   if (g.effMode !== 'curve') { const v = +g.eff; return () => (v >= 0 ? v : 0); }
   const p = gamCurve(g.curve); if (!p.length) return () => 0; if (p.length === 1) return () => p[0][1];
   return E => {
@@ -74,7 +76,9 @@ function gamBuild(sol, prod, Tirr, t1, t2, g) {
 //   spectrum: S_pu(E) = exp(−2μ)·S(E) + (pairs with both pulses full-energy)·(p ⊛ p)(E), p = S/ΣS, sum of the two energies.
 function gamDetPerDecay(e, eff) { let s = 0; if (e && e.gam) for (const l of e.gam) s += l[1] * Math.max(0, eff(l[0])); return s; }
 function gamPile(B, sol, g) {
-  const eff = gamEffFn(g), f = Math.max(1, +g.ftp || 1), tau = Math.max(0, +g.tau || 0) * 1e-6, dpd = sol.ids.map((id, i) => gamDetPerDecay(sol.info[i], eff));
+  const eff = gamEffFn(g), ge = g.effMode === 'ge', et = gamEffTotFn(g), dpt = ge ? sol.ids.map((id, i) => gamDetPerDecay(sol.info[i], et)) : null;
+  let f = Math.max(1, +g.ftp || 1); if (ge && g.ftpMode !== 'man') { let a = 0, b = 0; sol.ids.forEach((id, i) => { const r = sol.act[i][gamNearest(sol, (B.t1e + B.t2e) / 2)]; a += r * dpt[i]; b += r * gamDetPerDecay(sol.info[i], eff); }); f = b > 0 ? Math.max(1, a / b) : 1; }
+  const tau = Math.max(0, +g.tau || 0) * 1e-6, dpd = sol.ids.map((id, i) => gamDetPerDecay(sol.info[i], eff));
   const rateAt = t => { const k = gamNearest(sol, t); let r = 0; for (let i = 0; i < dpd.length; i++) if (dpd[i] > 0) r += sol.act[i][k] * dpd[i]; return r * f; };         // pulses per second at the node nearest to t
   const nbar = B.detected / B.live * f, n0 = rateAt(B.t1e), n1 = rateAt(B.t2e), nmax = Math.max(n0, n1, nbar);
   const mu = nbar * tau, mu0 = n0 * tau, mu1 = n1 * tau, mumax = nmax * tau;
@@ -121,20 +125,22 @@ function gamRender() {
     'decays in the slice: ' + fmt(B.sumD / B.live, 4) + ' Bq (mean)  ·  FWHM ' + (g.fmode === 'sqrt' ? fmt(g.fwhm, 3) + ' keV at 1 MeV, ∝ √E' : fmt(g.fwhm, 3) + ' keV')];
   const o = { series, xlabel: 'Energy (keV, 1 keV per channel)', ylabel: rate ? 'Counts per second per keV' : 'Counts per keV in the slice', title: 'γ spectrum · layer ' + (G.li + 1) + ' · detected', stats, xlog: false, ylog: g.ylog === 'log', xmin: G.xmin, xmax: G.xmax, ymin: G.ymin, ymax: G.ymax };
   const r = renderChart(o), gg = r.geom, zoomed = G.xmin !== '' || G.ymin !== '';
-  G.o = o; G.geom = gg;
+  G.o = o; G.geom = gg; G.names = { main: series.map(se => se.name) };
   const inp = (k, ex) => '<input type="number" data-gk="' + k + '" step="any" value="' + g[k] + '" ' + (ex || '') + '>', sel = (k, o2) => '<select data-gk="' + k + '">' + o2.map(x => '<option value="' + x[0] + '"' + (String(g[k]) === String(x[0]) ? ' selected' : '') + '>' + x[1] + '</option>').join('') + '</select>';
   const fld = (l, h, wide) => '<label class="fld"' + (wide ? ' style="grid-column:1/-1"' : '') + '><span>' + l + '</span>' + h + '</label>';
   const rows = B.nodes.map(n => '<tr><td><b>' + dkNuc(n.id) + '</b></td><td class="n">' + (n.T ? fmtHl(n.T) : '–') + '</td><td class="n">' + gamNum(n.D) + '</td><td class="n">' + fmt(n.gper, 4) + '</td><td class="n">' + gamNum(n.em) + '</td><td class="n">' + gamNum(n.em / B.live) + '</td><td class="n">' + gamNum(n.de) + '</td><td class="n">' + gamNum(n.de / B.live) + '</td><td style="white-space:normal;text-align:left">' + n.top.map(l => fmt(l[0], 6) + ' keV (' + gamNum(l[1]) + ')').join(', ') + '</td></tr>').join('');
+  let geBlock = ''; if (g.effMode === 'ge') geBlock = gamGeBlock(G, B, g);
   const keep = w.querySelector('.mbox'), scrollY = keep ? keep.scrollTop : 0;
   w.innerHTML = '<div class="mbox" style="width:min(1100px,100%)"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><h3>γ-ray spectrum of the time slice</h3><button class="btn sm" data-gclose>Close ✕</button></div>' +
     '<div class="mgrid">' + fld('Slice start (s)', '<input type="number" data-gt="t1" step="any" value="' + +(+B.t1e).toPrecision(8) + '" min="0">') + fld('Slice end (s)', '<input type="number" data-gt="t2" step="any" value="' + +(+B.t2e).toPrecision(8) + '" min="0">') +
     fld('Energy resolution (Gaussian), FWHM in keV', inp('fwhm', 'min="0"')) + fld('FWHM model', sel('fmode', [['const', 'constant'], ['sqrt', 'FWHM given at 1 MeV, ∝ √E']])) +
-    fld('Detector efficiency', sel('effMode', [['const', 'constant'], ['curve', 'curve ε(E)']])) + (g.effMode === 'curve' ? '' : fld('Constant efficiency (0 – 1)', inp('eff', 'min="0" step="any"'))) +
-    fld('Pulse width τ (µs), pile-up window ±τ', inp('tau', 'min="0"')) + fld('Pulses per full-energy count (total/peak ≥ 1)', inp('ftp', 'min="1"')) + fld('Pile-up spectrum', sel('puCurve', [['false', 'only probabilities'], ['true', 'add the pile-up spectrum']])) + fld('Y axis', sel('ylog', [['log', 'logarithmic'], ['lin', 'linear']])) + fld('Y units', sel('rate', [['false', 'counts per keV'], ['true', 'counts per second per keV']])) + fld('Isotopes in the plot', inp('top', 'min="1" max="30" step="1"')) +
-    (g.effMode === 'curve' ? '<label class="fld" style="grid-column:1/-1"><span>Efficiency curve: one pair “energy in keV, efficiency” per line (log-log interpolation, constant outside the range)</span><textarea data-gk="curve" rows="5" spellcheck="false" style="font-family:var(--font-mono);width:100%">' + esc(g.curve) + '</textarea></label>' : '') + '</div>' +
+    fld('Detector efficiency model', sel('effMode', [['const', 'constant'], ['curve', 'curve ε(E)'], ['ge', 'Ge detector (geometry model)']])) + (g.effMode === 'const' ? fld('Constant efficiency (0 – 1)', inp('eff', 'min="0" step="any"')) : '') +
+    (g.effMode === 'ge' ? fld('Crystal diameter (mm)', inp('geD', 'min="1"')) + fld('Crystal length (mm)', inp('geL', 'min="1"')) + fld('Source – endcap distance (mm)', inp('geDist', 'min="0"')) + fld('Endcap – crystal gap (mm)', inp('geGap', 'min="0"')) + fld('Dead layer, Ge (mm)', inp('geDead', 'min="0"')) + fld('Window, Al (mm)', inp('geWin', 'min="0"')) + fld('Efficiency scale factor', inp('geScale', 'min="0"')) : '') +
+    fld('Pulse width τ (µs), pile-up window ±τ', inp('tau', 'min="0"')) + (g.effMode === 'ge' ? fld('Pulses per full-energy count', sel('ftpMode', [['auto', 'from the model: ε_tot / ε_peak'], ['man', 'manual']])) + (g.ftpMode === 'man' ? fld('Pulses per full-energy count (≥ 1)', inp('ftp', 'min="1"')) : '') : fld('Pulses per full-energy count (total/peak ≥ 1)', inp('ftp', 'min="1"'))) + fld('Pile-up spectrum', sel('puCurve', [['false', 'only probabilities'], ['true', 'add the pile-up spectrum']])) + fld('Y axis', sel('ylog', [['log', 'logarithmic'], ['lin', 'linear']])) + fld('Y units', sel('rate', [['false', 'counts per keV'], ['true', 'counts per second per keV']])) + fld('Isotopes in the plot', inp('top', 'min="1" max="30" step="1"')) +
+    (g.effMode === 'ge' ? '<div class="hint" style="grid-column:1/-1">' + geInfo(g) + '</div>' : '') + (g.effMode === 'curve' ? '<label class="fld" style="grid-column:1/-1"><span>Efficiency curve: one pair “energy in keV, efficiency” per line (log-log interpolation, constant outside the range)</span><textarea data-gk="curve" rows="5" spellcheck="false" style="font-family:var(--font-mono);width:100%">' + esc(g.curve) + '</textarea></label>' : '') + '</div>' +
     '<div class="btns"><button class="btn sm" data-greset' + (zoomed ? '' : ' disabled') + '>Reset zoom</button><span class="hint">Drag a box to zoom · double-click resets · click a legend entry to show/hide an isotope</span></div>' +
-    '<div class="chart">' + r.svg + '</div><div class="legend">' + series.map(se => '<button data-gleg="' + esc(se.name) + '" class="' + (se.hidden ? 'off' : '') + '"><i style="background:' + se.color + '"></i>' + esc(se.name) + '</button>').join('') + '</div>' +
-    '<div class="readout" data-gro>Move the pointer over the plot to read values.</div>' +
+    '<div class="chart">' + r.svg + '</div><div class="legend">' + series.map(se => '<button data-gleg="' + esc(se.name) + '" class="' + (se.hidden ? 'off' : '') + '"><i style="background:' + se.color + '"></i>' + esc(se.name) + '</button>').join('') + '<button class="btn sm" data-gall="main" data-gstate="off" title="hide all curves of this plot">Unselect all</button><button class="btn sm" data-gall="main" data-gstate="on" title="show all curves of this plot">Select all</button><label class="hint">Y axis <select data-gk="ylog"><option value="log"' + (g.ylog === 'log' ? ' selected' : '') + '>logarithmic</option><option value="lin"' + (g.ylog === 'lin' ? ' selected' : '') + '>linear</option></select></label></div>' +
+    '<div class="readout" data-gro>Move the pointer over the plot to read values.</div>' + geBlock +
     '<div class="btns"><span class="lbl">Save</span><button class="btn sm" data-gsave="png">PNG</button><button class="btn sm" data-gsave="svg">SVG</button><button class="btn sm" data-gsave="txt">ASCII (.txt)</button><button class="btn sm" data-gsave="csv">Plot CSV</button><button class="btn sm" data-gsave="spec">Spectrum CSV (all isotopes)</button><button class="btn sm" data-gsave="tab">Isotope table CSV</button><span class="hint" id="gamMsg"></span></div>' +
     '<details class="cw" open><summary><b>Isotopes contributing in the slice</b> — ' + B.nodes.length + ' with γ lines · sorted by detected counts</summary><div class="tscroll" style="max-height:340px;overflow:auto"><table class="t lc"><tr><th>Nuclide</th><th class="n">Half-life</th><th class="n">Decays</th><th class="n">γ per decay</th><th class="n">γ emitted</th><th class="n">γ emitted per s</th><th class="n">Detected counts</th><th class="n">Detected per s</th><th>Strongest lines (emitted γ in the slice)</th></tr>' + (rows || '<tr><td colspan="9">No nuclide with γ lines decays in this slice.</td></tr>') + '</table></div></details>' +
     '<p class="hint">Decays of every nuclide in the slice are exact (atom balance with the ingrowth from the parents); each decay emits the discrete γ lines of the ENDF-6 decay file (MF 8 / MT 457, absolute intensity per decay). Not included: X-rays, annihilation radiation, conversion electrons, the continuum, coincidence summing, dead time and the detector response other than the Gaussian peak and the efficiency.</p></div>';
@@ -158,6 +164,31 @@ function gamRender() {
   });
   svg.addEventListener('pointercancel', () => { a0 = null; if (box) { box.remove(); box = null; } });
   svg.addEventListener('dblclick', () => { G.xmin = G.xmax = G.ymin = G.ymax = ''; gamRender(); });
+}
+function geInfo(g) {
+  const f = E => { const v = geEffC(E, g); return E + ' keV: ε<sub>peak</sub> ' + fmt(v.peak, 3) + ', ε<sub>tot</sub> ' + fmt(v.tot, 3); };
+  return f(122) + ' · ' + f(662) + ' · ' + f(1332.5) + ' · relative efficiency (1332.5 keV, 25 cm, vs 3″×3″ NaI) = ' + fmt(geRelEff(g), 3) + ' %';
+}
+function gamLegend(names, hidden, key, ylSel) {                // legend buttons of one plot + select/unselect all + linear/log y axis
+  return '<div class="legend">' + names.map(n => '<button data-gleg="' + esc(n[0]) + '" class="' + (hidden[n[0]] ? 'off' : '') + '"><i style="background:' + n[1] + '"></i>' + esc(n[0]) + '</button>').join('') +
+    '<button class="btn sm" data-gall="' + key + '" data-gstate="off" title="hide all curves of this plot">Unselect all</button><button class="btn sm" data-gall="' + key + '" data-gstate="on" title="show all curves of this plot">Select all</button>' +
+    (ylSel ? '<label class="hint">Y axis <select data-gyl="' + key + '"><option value="log"' + (ylSel === 'log' ? ' selected' : '') + '>logarithmic</option><option value="lin"' + (ylSel === 'lin' ? ' selected' : '') + '>linear</option></select></label>' : '') + '</div>';
+}
+function gamGeBlock(G, B, g) {                                 // efficiency curves and simulated Ge spectrum, shown below the γ plot
+  G.yl = G.yl || { eff: 'log', sim: '' }; const ylE = G.yl.eff || 'log', ylS = G.yl.sim || g.ylog, H = G.hidden;
+  const c = geCurves(g, 90), co = { series: [{ name: 'ε_peak (full energy)', type: 'line', x: c.x, y: c.pk, color: 'var(--accent)', w: 2 }, { name: 'ε_tot (total)', type: 'line', x: c.x, y: c.t, color: 'var(--bad)', w: 2, dash: '6 4' }], xlog: true, ylog: ylE === 'log', xmin: '20', xmax: '3000', xlabel: 'Energy (keV)', ylabel: 'Efficiency (per emitted γ)', title: 'Ge detector efficiency · Ø' + g.geD + ' × ' + g.geL + ' mm, ' + (+g.geDist) + ' mm from the endcap' };
+  co.series.forEach(se => { se.hidden = !!H[se.name]; });
+  { const vis = co.series.filter(se => !se.hidden), mx = Math.max(0, ...vis.flatMap(se => se.y)); if (mx > 0) {          // Y range from the visible curves: the top is the next 1-2-5 value above the maximum, the log axis spans 4 decades (the tiny values at low energy are cut)
+      const e = Math.pow(10, Math.floor(Math.log10(mx))), m = mx / e, top = (m <= 1 ? 1 : m <= 2 ? 2 : m <= 5 ? 5 : 10) * e;
+      if (ylE === 'log') { co.ymax = String(+top.toPrecision(2)); co.ymin = String(+(Math.pow(10, Math.floor(Math.log10(top)) - 4)).toPrecision(2)); } else { co.ymin = '0'; co.ymax = String(+top.toPrecision(2)); } } }
+  const D = gamDecays(G.sol, G.Q.prod, G.Q.Tirr, G.t1, G.t2).D, S = geSimSpectrum(G.sol, D, g, B.nch), rate = !!g.rate, dv = rate ? B.live : 1, sc = a => Float64Array.from(a, v => v / dv), edges = new Float64Array(B.nch + 1); for (let i = 0; i <= B.nch; i++) edges[i] = i;
+  const tot = new Float64Array(B.nch); for (let i = 0; i < B.nch; i++) tot[i] = S.peaks[i] + S.cont[i] + S.dbl[i];
+  G.sim = { S, tot };
+  const so = { series: [{ name: 'simulated Ge spectrum', type: 'hist', edges, y: sc(tot), color: 'var(--ink)', w: 1.4 }, { name: 'full-energy peaks', type: 'hist', edges, y: sc(S.peaks), color: 'var(--accent)', w: 1.1 }, { name: 'single Compton + escape peaks', type: 'hist', edges, y: sc(S.cont), color: 'var(--warn)', w: 1.1 }, { name: 'double Compton (2 scatterings)', type: 'hist', edges, y: sc(S.dbl), color: 'var(--bad)', w: 1.1 }], xlog: false, ylog: ylS === 'log', xlabel: 'Energy (keV, 1 keV per channel)', ylabel: rate ? 'Counts per second per keV' : 'Counts per keV in the slice', title: 'Simulated Ge spectrum · layer ' + (G.li + 1), xmin: G.xmin, xmax: G.xmax };
+  so.series.forEach(se => { se.hidden = !!H[se.name]; });
+  G.names.eff = co.series.map(x => x.name); G.names.sim = so.series.map(x => x.name);
+  return '<details class="cw" open><summary><b>Ge efficiency curves</b> — peak (full-energy) and total; they coincide at low energy, where every interaction ends in full absorption</summary><div class="chart" id="geEffChart">' + renderChart(co).svg + '</div>' + gamLegend(co.series.map(x => [x.name, x.color]), H, 'eff', ylE) + '</details>' +
+    '<details class="cw" open><summary><b>Simulated Ge spectrum</b> — peaks, Compton continuum and escape peaks (the same x range as the plot above)</summary><div class="chart" id="geSimChart">' + renderChart(so).svg + '</div>' + gamLegend(so.series.map(x => [x.name, x.color]), H, 'sim', ylS) + '</details>';
 }
 function gamCtx() {                                           // chart context of the spectrum as shown (for the exports)
   const G = GAM; if (!G || !G.o) return null; const div = document.createElement('div'); div.innerHTML = renderChart(G.o).svg;
@@ -186,10 +217,12 @@ document.addEventListener('click', async ev => {
   }
   if (!GAM) return;
   if (ev.target.closest('[data-greset]')) { GAM.xmin = GAM.xmax = GAM.ymin = GAM.ymax = ''; gamRender(); return; }
+  const ga = ev.target.closest('[data-gall]'); if (ga) { const nm = (GAM.names && GAM.names[ga.dataset.gall]) || []; nm.forEach(n => { GAM.hidden[n] = ga.dataset.gstate === 'off'; }); gamRender(); return; }
   const lg = ev.target.closest('[data-gleg]'); if (lg) { const n = lg.dataset.gleg; GAM.hidden[n] = !GAM.hidden[n]; gamRender(); }
 });
 document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && $('#gamWin') && !$('#gamWin').hidden) $('#gamWin').hidden = true; });
 document.addEventListener('change', ev => {
+  const yl = ev.target.closest && ev.target.closest('#gamWin [data-gyl]'); if (yl && GAM) { GAM.yl = GAM.yl || {}; GAM.yl[yl.dataset.gyl] = yl.value; gamRender(); return; }
   const e = ev.target.closest && ev.target.closest('#gamWin [data-gk]'); if (e && GAM) { const g = gamSet(), k = e.dataset.gk; g[k] = (k === 'rate' || k === 'puCurve') ? e.value === 'true' : (e.type === 'number' ? +e.value : e.value); if (k === 'ylog') { GAM.ymin = GAM.ymax = ''; } saveLocal(); gamRender(); return; }
   const t = ev.target.closest && ev.target.closest('#gamWin [data-gt]'); if (t && GAM) {
     const a = +$('#gamWin [data-gt=t1]').value, b2 = +$('#gamWin [data-gt=t2]').value; if (isFinite(a) && isFinite(b2) && b2 > a && a >= 0) gamOpenAt(GAM.li, a, b2);

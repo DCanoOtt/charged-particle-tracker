@@ -1,8 +1,0 @@
-dist/
-node_modules/
-__pycache__/
-*.pyc
-desktop/app/
-desktop/release/
-desktop/node_modules/
-.DS_Store

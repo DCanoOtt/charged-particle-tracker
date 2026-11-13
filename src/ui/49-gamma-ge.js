@@ -43,8 +43,8 @@ function geEffC(E, g) {
 function geRelEff(g) {                                        // ε_peak(1332.5 keV, 25 cm) / (1.2e-3 of a 3″×3″ NaI), %
   const p = geP(Object.assign({}, g, { geDist: 250 })); return 100 * geEff(1332.5, p).peak / 1.2e-3;
 }
-function geCurves(g, n) {                                     // log-spaced energies 20 keV – 3 MeV
-  const x = [], t = [], pk = []; for (let i = 0; i < n; i++) { const E = 20 * Math.pow(150, i / (n - 1)), v = geEffC(E, g); x.push(E); t.push(v.tot); pk.push(v.peak); } return { x, t, pk };
+function geCurves(g, n, Emax) {                               // log-spaced energies from 20 keV to Emax (default 3 MeV)
+  const x = [], t = [], pk = [], r = Math.max(2, (Emax || 3000) / 20); for (let i = 0; i < n; i++) { const E = 20 * Math.pow(r, i / (n - 1)), v = geEffC(E, g); x.push(E); t.push(v.tot); pk.push(v.peak); } return { x, t, pk };
 }
 function geKN(E, T) { const k = E / 510.999, s = T / E, q = 1 - s; const w = 2 + s * s / (k * k * q * q) + s / q * (s - 2 / k); return w > 0 ? w : 0; }   // Klein–Nishina shape dσ/dT (arbitrary scale)
 const GE_DBL = new Map();

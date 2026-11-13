@@ -272,6 +272,17 @@ with sync_playwright() as p:
     check('Ge model: curves and simulated spectrum are shown; the peaks of the simulation equal the detected counts; continuum present', ge['charts'] and abs(ge['sp']/ge['det']-1) < 1e-3 and ge['sc'] > 0 and ge['sd'] >= 0, ge)
     check('Ge model: pulses per full-energy count from ε_tot/ε_peak (> 1) and a realistic relative efficiency', ge['ftp'] > 1 and 3 < ge['rel'] < 100, ge)
     pg.locator('#gamWin .mbox').evaluate("e=>e.scrollTop=0"); pg.locator('#gamWin .mbox').screenshot(path='/tmp/ge1.png'); pg.locator('#geSimChart').scroll_into_view_if_needed(); pg.wait_for_timeout(300); pg.locator('#gamWin .mbox').screenshot(path='/tmp/ge2.png')
+    xr = pg.evaluate("({xmax:+GAM.geoms.eff.x1, nch:GAM.B.nch})") if False else None
+    def drag(sel, fx0, fy0, fx1, fy1):
+        pg.locator(sel).scroll_into_view_if_needed(); pg.wait_for_timeout(200); bb = pg.locator(sel).bounding_box(); pg.mouse.move(bb['x']+bb['width']*fx0, bb['y']+bb['height']*fy0); pg.mouse.down(); pg.mouse.move(bb['x']+bb['width']*fx1, bb['y']+bb['height']*fy1, steps=5); pg.mouse.up(); pg.wait_for_timeout(500)
+    ext = pg.evaluate("({ze:JSON.stringify(GAM.ze), nch:GAM.B.nch})")
+    drag('#geEffChart svg', 0.4, 0.2, 0.7, 0.6)
+    drag('#geSimChart svg', 0.4, 0.2, 0.8, 0.6)
+    zz = pg.evaluate("({ze:GAM.ze, zs:GAM.zs})")
+    check('zoom with the mouse in the efficiency curves and in the simulated spectrum', zz['ze'].get('xmin') and zz['ze'].get('ymax') and zz['zs'].get('xmin') and zz['zs'].get('ymax'), zz)
+    pg.click('[data-gzreset=eff]'); pg.click('[data-gzreset=sim]'); pg.wait_for_timeout(400)
+    zr = pg.evaluate("({ze:GAM.ze, zs:GAM.zs, xmax:+GAM.o.xmax || 0, nch:GAM.B.nch})")
+    check('reset zoom clears both', not zr['ze'] and not zr['zs'] or (not zr['ze'].get('xmin') and not zr['zs'].get('xmin')), zr)
     pg.locator('#geEffChart').screenshot(path='/tmp/geeff.png')
     pg.click('[data-gall=eff][data-gstate=off]'); pg.wait_for_timeout(400)
     lg = pg.evaluate("""(()=>{const w=document.querySelector('#gamWin'); return {eff:[...w.querySelectorAll('[data-gleg]')].filter(b=>/ε_/.test(b.textContent)).every(b=>b.classList.contains('off')), n:w.querySelectorAll('[data-gall]').length, err:!!w.querySelector('#geEffChart svg')}})()""")

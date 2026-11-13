@@ -164,6 +164,27 @@ function gamRender() {
   });
   svg.addEventListener('pointercancel', () => { a0 = null; if (box) { box.remove(); box = null; } });
   svg.addEventListener('dblclick', () => { G.xmin = G.xmax = G.ymin = G.ymax = ''; gamRender(); });
+  if (G.geoms) { gamZoom($('#geEffChart svg', w), G.geoms.eff, 'ze'); gamZoom($('#geSimChart svg', w), G.geoms.sim, 'zs'); }
+}
+function gamZoom(sv, gg, key) {                                // mouse zoom of a plot below the spectrum: state in GAM[key] = {xmin, xmax, ymin, ymax}
+  if (!sv || !gg) return; const G = GAM;
+  const pt = ev => { const q = sv.getBoundingClientRect(); return [(ev.clientX - q.left) / q.width * gg.W, (ev.clientY - q.top) / q.height * gg.H]; }, clamp = ([px, py]) => [Math.min(Math.max(px, gg.m.l), gg.m.l + gg.iw), Math.min(Math.max(py, gg.m.t), gg.m.t + gg.ih)];
+  let a0 = null, box = null;
+  sv.addEventListener('pointerdown', ev => {
+    if (ev.button !== 0 || ev.pointerType === 'touch') return; const [px, py] = pt(ev); if (px < gg.m.l || px > gg.m.l + gg.iw || py < gg.m.t || py > gg.m.t + gg.ih) return;
+    a0 = [px, py]; sv.setPointerCapture(ev.pointerId); box = document.createElementNS('http://www.w3.org/2000/svg', 'rect'); box.setAttribute('fill', 'var(--accent)'); box.setAttribute('fill-opacity', '.15'); box.setAttribute('stroke', 'var(--accent)'); sv.appendChild(box);
+  });
+  sv.addEventListener('pointermove', ev => {
+    if (!a0) return; const p = clamp(pt(ev)), dx = Math.abs(p[0] - a0[0]), dy = Math.abs(p[1] - a0[1]);
+    box.setAttribute('x', dx < 6 ? gg.m.l : Math.min(p[0], a0[0])); box.setAttribute('width', dx < 6 ? gg.iw : dx); box.setAttribute('y', dy < 6 ? gg.m.t : Math.min(p[1], a0[1])); box.setAttribute('height', dy < 6 ? gg.ih : dy);
+  });
+  sv.addEventListener('pointerup', ev => {
+    if (!a0) return; const p = clamp(pt(ev)), s0 = a0, dx = Math.abs(p[0] - s0[0]), dy = Math.abs(p[1] - s0[1]); a0 = null; if (box) { box.remove(); box = null; } if (dx < 6 && dy < 6) return;
+    const [xa, ya] = pxData(gg, Math.min(p[0], s0[0]), Math.max(p[1], s0[1])), [xb, yb] = pxData(gg, Math.max(p[0], s0[0]), Math.min(p[1], s0[1])), z = G[key] || (G[key] = {});
+    if (dx >= 6) { z.xmin = fmtAx(xa); z.xmax = fmtAx(xb); } if (dy >= 6) { z.ymin = fmtAx(ya); z.ymax = fmtAx(yb); } gamRender();
+  });
+  sv.addEventListener('pointercancel', () => { a0 = null; if (box) { box.remove(); box = null; } });
+  sv.addEventListener('dblclick', () => { G[key] = {}; gamRender(); });
 }
 function geInfo(g) {
   const f = E => { const v = geEffC(E, g); return E + ' keV: ε<sub>peak</sub> ' + fmt(v.peak, 3) + ', ε<sub>tot</sub> ' + fmt(v.tot, 3); };
@@ -171,24 +192,26 @@ function geInfo(g) {
 }
 function gamLegend(names, hidden, key, ylSel) {                // legend buttons of one plot + select/unselect all + linear/log y axis
   return '<div class="legend">' + names.map(n => '<button data-gleg="' + esc(n[0]) + '" class="' + (hidden[n[0]] ? 'off' : '') + '"><i style="background:' + n[1] + '"></i>' + esc(n[0]) + '</button>').join('') +
-    '<button class="btn sm" data-gall="' + key + '" data-gstate="off" title="hide all curves of this plot">Unselect all</button><button class="btn sm" data-gall="' + key + '" data-gstate="on" title="show all curves of this plot">Select all</button>' +
+    '<button class="btn sm" data-gzreset="' + key + '" title="reset the zoom of this plot (or double-click it)">Reset zoom</button><button class="btn sm" data-gall="' + key + '" data-gstate="off" title="hide all curves of this plot">Unselect all</button><button class="btn sm" data-gall="' + key + '" data-gstate="on" title="show all curves of this plot">Select all</button>' +
     (ylSel ? '<label class="hint">Y axis <select data-gyl="' + key + '"><option value="log"' + (ylSel === 'log' ? ' selected' : '') + '>logarithmic</option><option value="lin"' + (ylSel === 'lin' ? ' selected' : '') + '>linear</option></select></label>' : '') + '</div>';
 }
 function gamGeBlock(G, B, g) {                                 // efficiency curves and simulated Ge spectrum, shown below the γ plot
   G.yl = G.yl || { eff: 'log', sim: '' }; const ylE = G.yl.eff || 'log', ylS = G.yl.sim || g.ylog, H = G.hidden;
-  const c = geCurves(g, 90), co = { series: [{ name: 'ε_peak (full energy)', type: 'line', x: c.x, y: c.pk, color: 'var(--accent)', w: 2 }, { name: 'ε_tot (total)', type: 'line', x: c.x, y: c.t, color: 'var(--bad)', w: 2, dash: '6 4' }], xlog: true, ylog: ylE === 'log', xmin: '20', xmax: '3000', xlabel: 'Energy (keV)', ylabel: 'Efficiency (per emitted γ)', title: 'Ge detector efficiency · Ø' + g.geD + ' × ' + g.geL + ' mm, ' + (+g.geDist) + ' mm from the endcap' };
+  const ze = G.ze || (G.ze = {}), zs = G.zs || (G.zs = {}), Emax = Math.max(100, Math.min(10000, B.nch)), c = geCurves(g, 140, Emax), co = { series: [{ name: 'ε_peak (full energy)', type: 'line', x: c.x, y: c.pk, color: 'var(--accent)', w: 2 }, { name: 'ε_tot (total)', type: 'line', x: c.x, y: c.t, color: 'var(--bad)', w: 2, dash: '6 4' }], xlog: true, ylog: ylE === 'log', xmin: ze.xmin || '20', xmax: ze.xmax || String(Emax), xlabel: 'Energy (keV)', ylabel: 'Efficiency (per emitted γ)', title: 'Ge detector efficiency · Ø' + g.geD + ' × ' + g.geL + ' mm, ' + (+g.geDist) + ' mm from the endcap' };
   co.series.forEach(se => { se.hidden = !!H[se.name]; });
-  { const vis = co.series.filter(se => !se.hidden), mx = Math.max(0, ...vis.flatMap(se => se.y)); if (mx > 0) {          // Y range from the visible curves: the top is the next 1-2-5 value above the maximum, the log axis spans 4 decades (the tiny values at low energy are cut)
+  { const x0 = +co.xmin, x1 = +co.xmax, vis = co.series.filter(se => !se.hidden), mx = Math.max(0, ...vis.flatMap(se => se.y.filter((v, i) => c.x[i] >= x0 * 0.999 && c.x[i] <= x1 * 1.001))); if (mx > 0) {          // Y range from the visible curves: the top is the next 1-2-5 value above the maximum, the log axis spans 4 decades (the tiny values at low energy are cut)
       const e = Math.pow(10, Math.floor(Math.log10(mx))), m = mx / e, top = (m <= 1 ? 1 : m <= 2 ? 2 : m <= 5 ? 5 : 10) * e;
       if (ylE === 'log') { co.ymax = String(+top.toPrecision(2)); co.ymin = String(+(Math.pow(10, Math.floor(Math.log10(top)) - 4)).toPrecision(2)); } else { co.ymin = '0'; co.ymax = String(+top.toPrecision(2)); } } }
+  if (ze.ymin !== undefined && ze.ymin !== '') co.ymin = ze.ymin; if (ze.ymax !== undefined && ze.ymax !== '') co.ymax = ze.ymax;
   const D = gamDecays(G.sol, G.Q.prod, G.Q.Tirr, G.t1, G.t2).D, S = geSimSpectrum(G.sol, D, g, B.nch), rate = !!g.rate, dv = rate ? B.live : 1, sc = a => Float64Array.from(a, v => v / dv), edges = new Float64Array(B.nch + 1); for (let i = 0; i <= B.nch; i++) edges[i] = i;
   const tot = new Float64Array(B.nch); for (let i = 0; i < B.nch; i++) tot[i] = S.peaks[i] + S.cont[i] + S.dbl[i];
   G.sim = { S, tot };
-  const so = { series: [{ name: 'simulated Ge spectrum', type: 'hist', edges, y: sc(tot), color: 'var(--ink)', w: 1.4 }, { name: 'full-energy peaks', type: 'hist', edges, y: sc(S.peaks), color: 'var(--accent)', w: 1.1 }, { name: 'single Compton + escape peaks', type: 'hist', edges, y: sc(S.cont), color: 'var(--warn)', w: 1.1 }, { name: 'double Compton (2 scatterings)', type: 'hist', edges, y: sc(S.dbl), color: 'var(--bad)', w: 1.1 }], xlog: false, ylog: ylS === 'log', xlabel: 'Energy (keV, 1 keV per channel)', ylabel: rate ? 'Counts per second per keV' : 'Counts per keV in the slice', title: 'Simulated Ge spectrum · layer ' + (G.li + 1), xmin: G.xmin, xmax: G.xmax };
+  const so = { series: [{ name: 'simulated Ge spectrum', type: 'hist', edges, y: sc(tot), color: 'var(--ink)', w: 1.4 }, { name: 'full-energy peaks', type: 'hist', edges, y: sc(S.peaks), color: 'var(--accent)', w: 1.1 }, { name: 'single Compton + escape peaks', type: 'hist', edges, y: sc(S.cont), color: 'var(--warn)', w: 1.1 }, { name: 'double Compton (2 scatterings)', type: 'hist', edges, y: sc(S.dbl), color: 'var(--bad)', w: 1.1 }], xlog: false, ylog: ylS === 'log', xlabel: 'Energy (keV, 1 keV per channel)', ylabel: rate ? 'Counts per second per keV' : 'Counts per keV in the slice', title: 'Simulated Ge spectrum · layer ' + (G.li + 1), xmin: zs.xmin || G.xmin, xmax: zs.xmax || G.xmax, ymin: zs.ymin || '', ymax: zs.ymax || '' };
   so.series.forEach(se => { se.hidden = !!H[se.name]; });
   G.names.eff = co.series.map(x => x.name); G.names.sim = so.series.map(x => x.name);
-  return '<details class="cw" open><summary><b>Ge efficiency curves</b> — peak (full-energy) and total; they coincide at low energy, where every interaction ends in full absorption</summary><div class="chart" id="geEffChart">' + renderChart(co).svg + '</div>' + gamLegend(co.series.map(x => [x.name, x.color]), H, 'eff', ylE) + '</details>' +
-    '<details class="cw" open><summary><b>Simulated Ge spectrum</b> — peaks, Compton continuum and escape peaks (the same x range as the plot above)</summary><div class="chart" id="geSimChart">' + renderChart(so).svg + '</div>' + gamLegend(so.series.map(x => [x.name, x.color]), H, 'sim', ylS) + '</details>';
+  const re = renderChart(co), rs = renderChart(so); G.geoms = { eff: re.geom, sim: rs.geom };
+  return '<details class="cw" open><summary><b>Ge efficiency curves</b> — peak (full-energy) and total; they coincide at low energy, where every interaction ends in full absorption · drag a box to zoom, double-click resets</summary><div class="chart" id="geEffChart">' + re.svg + '</div>' + gamLegend(co.series.map(x => [x.name, x.color]), H, 'eff', ylE) + '</details>' +
+    '<details class="cw" open><summary><b>Simulated Ge spectrum</b> — peaks, Compton continuum and escape peaks (follows the x range of the plot above until zoomed here · drag a box to zoom, double-click resets)</summary><div class="chart" id="geSimChart">' + rs.svg + '</div>' + gamLegend(so.series.map(x => [x.name, x.color]), H, 'sim', ylS) + '</details>';
 }
 function gamCtx() {                                           // chart context of the spectrum as shown (for the exports)
   const G = GAM; if (!G || !G.o) return null; const div = document.createElement('div'); div.innerHTML = renderChart(G.o).svg;
@@ -217,12 +240,13 @@ document.addEventListener('click', async ev => {
   }
   if (!GAM) return;
   if (ev.target.closest('[data-greset]')) { GAM.xmin = GAM.xmax = GAM.ymin = GAM.ymax = ''; gamRender(); return; }
+  const zr = ev.target.closest('[data-gzreset]'); if (zr) { GAM[zr.dataset.gzreset === 'eff' ? 'ze' : 'zs'] = {}; gamRender(); return; }
   const ga = ev.target.closest('[data-gall]'); if (ga) { const nm = (GAM.names && GAM.names[ga.dataset.gall]) || []; nm.forEach(n => { GAM.hidden[n] = ga.dataset.gstate === 'off'; }); gamRender(); return; }
   const lg = ev.target.closest('[data-gleg]'); if (lg) { const n = lg.dataset.gleg; GAM.hidden[n] = !GAM.hidden[n]; gamRender(); }
 });
 document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && $('#gamWin') && !$('#gamWin').hidden) $('#gamWin').hidden = true; });
 document.addEventListener('change', ev => {
-  const yl = ev.target.closest && ev.target.closest('#gamWin [data-gyl]'); if (yl && GAM) { GAM.yl = GAM.yl || {}; GAM.yl[yl.dataset.gyl] = yl.value; gamRender(); return; }
+  const yl = ev.target.closest && ev.target.closest('#gamWin [data-gyl]'); if (yl && GAM) { GAM.yl = GAM.yl || {}; GAM.yl[yl.dataset.gyl] = yl.value; GAM[yl.dataset.gyl === 'eff' ? 'ze' : 'zs'] = Object.assign({}, GAM[yl.dataset.gyl === 'eff' ? 'ze' : 'zs'], { ymin: '', ymax: '' }); gamRender(); return; }
   const e = ev.target.closest && ev.target.closest('#gamWin [data-gk]'); if (e && GAM) { const g = gamSet(), k = e.dataset.gk; g[k] = (k === 'rate' || k === 'puCurve') ? e.value === 'true' : (e.type === 'number' ? +e.value : e.value); if (k === 'ylog') { GAM.ymin = GAM.ymax = ''; } saveLocal(); gamRender(); return; }
   const t = ev.target.closest && ev.target.closest('#gamWin [data-gt]'); if (t && GAM) {
     const a = +$('#gamWin [data-gt=t1]').value, b2 = +$('#gamWin [data-gt=t2]').value; if (isFinite(a) && isFinite(b2) && b2 > a && a >= 0) gamOpenAt(GAM.li, a, b2);

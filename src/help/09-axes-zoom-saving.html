@@ -1,0 +1,7 @@
+<h4 id="h9">9. Axes, zoom and saving</h4>
+<ul>
+<li>Every plot has X/Y minimum and maximum (blank = automatic), linear or logarithmic X and Y scales, and editable title and axis labels; <i>Reset axes &amp; labels</i> clears them. Histogram plots also have <b>Bins</b> and a Y-axis choice: fraction of primaries per bin, counts per bin or probability density. Click a legend entry to hide a curve.</li>
+<li><b>Zoom</b>: drag a rectangle on the plot (a thin band zooms one axis only), double-click to return. On histograms, zooming re-bins the visible range for more detail; touch screens use the buttons. Hover to read values.</li>
+<li><b>Save plot</b>: PNG (1200/1800/3000 px), PDF (image on a page), SVG (vector), ASCII (.txt with headers and columns), CSV, a binary <b>ROOT file</b> (one TH1D per series; inside the Claude viewer it comes in a zip), or a <b>ROOT macro</b> (a C++ macro that fills TH1D/TGraph objects and writes the .root file; remove the extra “.txt” from the file name, rename to .C and run <code>root -l -b -q name.C</code>). You are asked to confirm each save. “Copy CSV” puts the data on the clipboard.</li>
+</ul>
+

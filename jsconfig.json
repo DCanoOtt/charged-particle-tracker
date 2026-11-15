@@ -1,0 +1,5 @@
+{
+  "compilerOptions": { "target": "es2022", "lib": ["es2022", "dom"], "checkJs": false, "allowJs": true, "noEmit": true, "strict": false, "noImplicitAny": false },
+  "include": ["src/types.d.ts", "src/ui/*.js", "data/xray.js"],
+  "exclude": ["node_modules"]
+}

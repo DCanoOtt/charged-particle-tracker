@@ -1,0 +1,32 @@
+{
+ "alpha 5 MeV Si": {
+  "meanZ": 0.0023932717420393603,
+  "sigmaZ": 0.0000289887706867869,
+  "meanPath": 0.0024235148075968027,
+  "depTotal": 1999.9999866485596,
+  "nTrans": 0,
+  "nBack": 0,
+  "nStop": 400,
+  "nDelta": 0
+ },
+ "proton 20 MeV water": {
+  "meanZ": 0.4273309237261613,
+  "sigmaZ": 0.016934354414741046,
+  "meanPath": 0.4279173309107622,
+  "depTotal": 5984.394707202911,
+  "nTrans": 0,
+  "nBack": 0,
+  "nStop": 299,
+  "nDelta": 4468
+ },
+ "alpha 8 MeV Au thin": {
+  "meanZ": 0.00030000010156072676,
+  "sigmaZ": 0,
+  "meanPath": 0.0003003959151101299,
+  "depTotal": 446.95577228069305,
+  "nTrans": 400,
+  "nBack": 0,
+  "nStop": 0,
+  "nDelta": 0
+ }
+}

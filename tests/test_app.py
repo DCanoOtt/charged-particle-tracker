@@ -97,6 +97,31 @@ with sync_playwright() as p:
     tot = pg.evaluate("(()=>{const F=alibFold(RES);return F.rows.filter(r=>r.d.channels[3]).map(r=>alibTotal(F,r))[0]})()")
     mt3 = fold
     check('sum of channels = MT3', abs(tot['P'] / mt3 - 1) < 1e-6, tot['P'])
+    # card "Production cross sections"
+    pg.evaluate("()=>{xsRender()}"); pg.wait_for_timeout(300)
+    xc = pg.evaluate("({vis: !document.querySelector('#cXs').hidden, fold: !!document.querySelector('#cXs > h2[data-fold]'), p: [xsParse('Ar-37'), xsParse('37Ar').ZA, xsParse('Cl-38m').st, xsParse('Cl38g').st, xsParse('xx')]})")
+    check('production-xs card exists, is collapsible and parses the product names', xc['vis'] and xc['fold'] and xc['p'][0]['ZA'] == 18037 and xc['p'][1] == 18037 and xc['p'][2] == 1 and xc['p'][3] == 0 and xc['p'][4] is None, xc)
+    for prod in ('Ca-44', 'Ca-42'):
+        pg.fill('#xsProd', prod); pg.click('#xsAdd'); pg.wait_for_timeout(300)
+    xd = pg.evaluate("""()=>{const o=XS.o, b=document.querySelector('#xsPlot'); const mx=o.series.map(s=>Math.max(...s.y)); const m16=(()=>{const F=alibFold(RES);return 0})();
+      return {n: o.series.length, mx, y:!!b.querySelector('[data-xgyl]'), x:!!b.querySelector('[data-xgxl]'), r:!!b.querySelector('[data-xgzr]'), leg: b.querySelectorAll('[data-xleg]').length, sv: b.querySelectorAll('[data-xsave]').length, w:!!b.querySelector('[data-expres]'), chips: document.querySelectorAll('#xsChips [data-xsdel]').length}}""")
+    check('production cross sections: two curves with positive σ (mb), standard controls, 7 save formats', xd['n'] == 2 and min(xd['mx']) > 0 and xd['y'] and xd['x'] and xd['r'] and xd['leg'] == 2 and xd['sv'] == 7 and xd['w'] and xd['chips'] == 2, xd)
+    # value check: Ca-42 (MT16 only) at 10 MeV equals the MT16 cross section of the library x its weight (pure Ar-40 + minor isotopes)
+    xv = pg.evaluate("""()=>{const it=xsItems().find(q=>q.ZA===20042), c=xsCurve(it, 10); const {rows}=xsRows('all'); let ref=0; for(const r of rows){const ch=r.d.channels[16]; if(ch) ref+=r.w*chSigma(ch,10)*1000;} const k=c.x.findIndex(v=>Math.abs(v-10)<1e-9); return [c.y[k], ref]}""")
+    check('σ_prod of Ca-42 at 10 MeV = abundance-weighted MT16 cross section of the library', xv[1] > 0 and abs(xv[0] / xv[1] - 1) < 0.02, xv)
+    xn = pg.evaluate("(()=>{const it=xsItems()[0]; irrSet().xsN=50; const a=xsCurve(it,10).x.length; irrSet().xsN=300; irrSet().xsLib=true; const b=xsCurve(it,10).x.length; irrSet().xsLib=false; return [a,b]})()")
+    check('production cross sections: number of points is adjustable (50 -> 51 points; library grid option)', xn[0] == 51 and xn[1] > 5, xn)
+    lgx = pg.evaluate("""()=>{const r=renderChart(XS.o), d=document.createElement('div'); d.innerHTML=r.svg; const old=_chart; _chart={o:XS.o, geom:r.geom, svg:d.querySelector('svg'), base:'t', key:'t'}; try{ const s=exportSvgString(), doc=new DOMParser().parseFromString(s,'image/svg+xml'); const ln=[...doc.querySelectorAll('line[stroke-width="2.4"]')]; return {n: ln.length, below: ln.every(l=>+l.getAttribute('y1')>r.geom.H), h: +doc.documentElement.getAttribute('height')>r.geom.H, title: XS.o.title + ' | ' + (XS.o.stats||[]).join(' ')}} finally {_chart=old}}""")
+    check('exported plots: legend below the plot (never over the data); title/target names the layer material', lgx['n'] == 2 and lgx['below'] and lgx['h'] and 'Argon' in lgx['title'], lgx)
+    pg.select_option('#xsPlot [data-xgxl]', 'log'); pg.select_option('#xsPlot [data-xgyl]', 'lin')
+    xl = pg.evaluate("[XS.o.xlog, XS.o.ylog]")
+    check('production cross sections: X and Y axis selectors work', xl == [True, False], xl)
+    pg.click('#xsPlot [data-xleg]'); xh = pg.evaluate("XS.o.series.filter(s=>s.hidden).length")
+    check('production cross sections: legend hides a curve', xh == 1, xh)
+    pg.click('#xsChips [data-xsdel]'); xr = pg.evaluate("xsItems().length")
+    check('production cross sections: a curve can be removed', xr == 1, xr)
+    pg.click('#cXs > h2[data-fold]'); xf = pg.evaluate("document.querySelector('#cXs').classList.contains('collapsed')"); pg.click('#cXs > h2[data-fold]')
+    check('production-xs card collapses and expands', xf is True)
     check('MT5/MT16 yields: neutrons > protons and photons counted', tot['Y']['n'] > tot['Y']['p'] > 0 and tot['Y']['g'] > 0)
     # secondary distributions: angle-integrated spectrum = yield, and 4pi * angular integral = integrated spectrum
     chk = pg.evaluate("""(()=>{const F=alibFold(RES),out={};

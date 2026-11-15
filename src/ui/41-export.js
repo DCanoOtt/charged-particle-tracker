@@ -17,6 +17,48 @@ const LIGHT = {
 };
 const EXP_STYLE =
   'text{font-family:Arial,Helvetica,sans-serif}.ax text{font-size:11.5px;fill:#52626f}.ax line,.ax path{stroke:#52626f;fill:none}.grid{stroke:#d3dae1;stroke-width:1}.grid.minor{stroke-opacity:.45;stroke-dasharray:2 3}.lab{font-size:12.5px;fill:#111c26}.ttl{font-size:14px;font-weight:600;fill:#111c26}.band{fill:#0a6f82;opacity:.08}.band.alt{opacity:.16}.bandl{font-size:11px;fill:#52626f}';
+function exportLegend(o, geom) {
+  // entries flow from left to right and wrap; returns the extra height of the band under the plot and its SVG
+  const items = o.series.filter(s => s.name && !s.hidden);
+  if (!items.length) return { h: 0, svg: '' };
+  const x0 = geom.m.l,
+    xmax = geom.W - 16,
+    rowH = 18;
+  let x = x0,
+    row = 0,
+    out = '';
+  items.forEach(s => {
+    const w = 38 + String(s.name).length * 6.4;
+    if (x > x0 && x + w > xmax) {
+      x = x0;
+      row++;
+    }
+    const yy = geom.H + 6 + row * rowH + 9,
+      col = s.color || 'var(--accent)';
+    out +=
+      '<line x1="' +
+      x +
+      '" x2="' +
+      (x + 22) +
+      '" y1="' +
+      yy +
+      '" y2="' +
+      yy +
+      '" stroke="' +
+      col +
+      '" stroke-width="2.4"' +
+      (s.dash ? ' stroke-dasharray="' + s.dash + '"' : '') +
+      '/><text x="' +
+      (x + 28) +
+      '" y="' +
+      (yy + 4) +
+      '" style="font-size:11.5px;fill:#111c26">' +
+      esc(s.name) +
+      '</text>';
+    x += w;
+  });
+  return { h: (row + 1) * rowH + 12, svg: out };
+}
 function exportSvgString() {
   const { o, geom } = _chart,
     src = _chart.svg || $('#chartBox svg');
@@ -27,45 +69,12 @@ function exportSvgString() {
   c.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
   c.setAttribute('width', geom.W);
   c.setAttribute('height', geom.H);
-  // legend inside the plot, top right
-  const items = o.series.filter(s => s.name && !s.hidden);
-  let lg = '',
-    y = geom.m.t + 8,
-    wmax = 0;
-  items.forEach(s => {
-    wmax = Math.max(wmax, s.name.length);
-  });
-  if (items.length) {
-    const bw = Math.min(260, 40 + wmax * 6.6),
-      bx = geom.m.l + geom.iw - bw - 8;
-    lg +=
-      '<rect x="' + bx + '" y="' + (y - 4) + '" width="' + bw + '" height="' + (items.length * 17 + 6) + '" fill="#fff" fill-opacity=".85" stroke="#d3dae1"/>';
-    items.forEach((s, i) => {
-      const yy = y + 8 + i * 17,
-        col = s.color || 'var(--accent)';
-      lg +=
-        '<line x1="' +
-        (bx + 8) +
-        '" x2="' +
-        (bx + 28) +
-        '" y1="' +
-        yy +
-        '" y2="' +
-        yy +
-        '" stroke="' +
-        col +
-        '" stroke-width="2.4"' +
-        (s.dash ? ' stroke-dasharray="' + s.dash + '"' : '') +
-        '/><text x="' +
-        (bx + 34) +
-        '" y="' +
-        (yy + 4) +
-        '" style="font-size:11.5px;fill:#111c26">' +
-        esc(s.name) +
-        '</text>';
-    });
-  }
-  c.insertAdjacentHTML('afterbegin', '<style>' + EXP_STYLE + '</style><rect width="' + geom.W + '" height="' + geom.H + '" fill="#fff"/>');
+  // legend in a band below the plot (never over the data)
+  const lgd = exportLegend(o, geom);
+  c.setAttribute('height', geom.H + lgd.h);
+  c.setAttribute('viewBox', '0 0 ' + geom.W + ' ' + (geom.H + lgd.h));
+  const lg = lgd.svg;
+  c.insertAdjacentHTML('afterbegin', '<style>' + EXP_STYLE + '</style><rect width="' + geom.W + '" height="' + (geom.H + lgd.h) + '" fill="#fff"/>');
   c.insertAdjacentHTML('beforeend', lg);
   let str = new XMLSerializer().serializeToString(c);
   str = str.replace(/var\((--[a-z0-9-]+)\)/g, (m, k) => LIGHT[k] || '#000');
@@ -79,7 +88,7 @@ function svgToCanvas(widthPx) {
     img.onload = () => {
       const cv = document.createElement('canvas');
       cv.width = widthPx;
-      cv.height = Math.round((widthPx * g.H) / g.W);
+      cv.height = Math.round((widthPx * (g.H + exportLegend(_chart.o, g).h)) / g.W);
       const cx = cv.getContext('2d');
       cx.fillStyle = '#fff';
       cx.fillRect(0, 0, cv.width, cv.height);
@@ -94,7 +103,7 @@ const canvasBlob = (cv, type, q) => new Promise((res, rej) => cv.toBlob(b => (b 
 async function makePdf(cv, g) {
   const jpg = new Uint8Array(await (await canvasBlob(cv, 'image/jpeg', 0.95)).arrayBuffer());
   const PW = 720,
-    PH = +((720 * g.H) / g.W).toFixed(2),
+    PH = +((720 * cv.height) / cv.width).toFixed(2),
     enc = new TextEncoder(),
     chunks = [],
     offs = [];

@@ -330,14 +330,16 @@ function parseEndfDecay(text, out) {
       }
       out.set(ZA * 10 + Math.max(0, Math.min(9, liso)), entry);
       n++;
-      // RI is given in “relative units”: the ENDF/B, JEFF… decay sublibraries use per cent (per 100 decays), other files use per decay.
+      // RI is a “relative intensity” and the units are not declared in the file (absolute intensity = FD·RI). ENDF/B-VIII.0 gives absolute intensities per decay (FD = 1, e.g. Co-60 1332.492 keV: 0.999826); other libraries/files may give per cent (per 100 decays).
       // Only gamma lines decide the units (electron and X-ray yields can exceed 1.5 per decay). A line above 1.5 can only be per cent (a per-decay intensity of one line cannot exceed ~1): once seen, all lines of the library are divided by 100.
       if (entry.gam || entry.xr || entry.ann) {
         entry.graw = true;
         if ((entry.gam || []).some(g => g[1] > 1.5 && !g[2])) out.gpct = true;
       }
     } catch (e) {
-      /* damaged section: skipped */
+      /* damaged section: skipped (counted, the first message is kept for the status line) */
+      out.nbad = (out.nbad || 0) + 1;
+      if (!out.ebad) out.ebad = (e && e.message) || String(e);
     }
     i = j - 1;
   }
@@ -386,6 +388,7 @@ function decResetAll() {
     if (w) w.hidden = true;
   }
 }
+const DK_UNIT_REF = [270600, 551370, 631520, 110220, 952410, 561330, 250540, 300650, 270570, 391880, 400950]; // Co-60, Cs-137, Eu-152, Na-22, Am-241, Ba-133, Mn-54, Zn-65, Co-57, Y-88, Zr-95
 async function dkLoadFiles(files, name) {
   try {
     await dkLoadFiles0(files, name);
@@ -402,7 +405,7 @@ async function dkLoadFiles0(files, name) {
   DEC.busy = true;
   DEC.name = name;
   const rest = [],
-    st = { n: files.length, skip: 0, big: 0, err: '', fail: 0, ex: files.slice(0, 3).map(f => f.name) };
+    st = { n: files.length, skip: 0, big: 0, err: '', fail: 0, ex: files.slice(0, 3).map(f => f.name + ' ' + (f.size / 1e6).toFixed(1) + ' MB') };
   for (const f of files) {
     if (/\.(png|jpe?g|gif|pdf|zip|gz|html?|tendl)$/i.test(f.name)) {
       st.skip++;
@@ -432,6 +435,10 @@ async function dkLoadFiles0(files, name) {
       if (!st.err) st.err = (e && e.message) || String(e);
     }
   }
+  // units of the gamma intensities (per cent or per decay) are decided library-wide from lines above 1.5: a few reference nuclides with strong lines are read at once, so that a chain
+  // of pure β+ emitters (only the 511 keV annihilation line) or other nuclides without a strong line is not left without evidence
+  for (const id of DK_UNIT_REF) if (DEC.idx.has(id) && !DEC.map.has(id)) await decReadId(id);
+  gamUnits(DEC.map);
   DEC.nuc = DEC.idx.size + DEC.map.size;
   DEC.busy = false;
   DEC.prog = '';
@@ -456,6 +463,7 @@ async function dkLoadFiles0(files, name) {
       '; could not be read: ' +
       st.fail +
       (st.err ? ' (' + st.err + ')' : '') +
+      (DEC.map.nbad ? '; ' + DEC.map.nbad + ' MF 8 / MT 457 sections could not be parsed (first error: ' + DEC.map.ebad + ')' : '') +
       '.';
   if (DEC.nuc) irrSet().src = 'file';
   saveLocal();
@@ -502,16 +510,21 @@ async function decPrefetch(ids, fb, prog) {
     if (e && e.br && e.T > 0) for (const b of e.br) if (b.d != null) q.push(b.d);
   }
   gamUnits(DEC.map);
+  if (!DEC.nuc) return;
+  const nm = DEC.map.size - DEC.nread; // nuclides that came from files read completely (files without a nuclide name, e.g. one big file)
   DEC.msg =
-    DEC.idx.size.toLocaleString('en') +
-    ' decay files indexed in “' +
+    '“' +
     DEC.name +
-    '”; only the ' +
-    DEC.nread +
-    ' needed for these chains ' +
-    (DEC.nread === 1 ? 'was' : 'were') +
-    ' read' +
-    (DEC.miss.size && fb ? '; ' + DEC.miss.size + ' nuclides without a file use the internal values' : '') +
+    '”: ' +
+    (DEC.idx.size
+      ? DEC.idx.size.toLocaleString('en') + ' decay files indexed by name, only the ' + DEC.nread + ' needed for these chains read'
+      : 'no file name identifies a nuclide') +
+    (nm > 0 || !DEC.idx.size
+      ? ' · ' + Math.max(0, DEC.idx.size ? nm : DEC.map.size).toLocaleString('en') + ' nuclides read from files without a nuclide name'
+      : '') +
+    (DEC.miss.size
+      ? ' · ' + DEC.miss.size + ' nuclides of these chains are not in the library' + (fb ? ' (internal values used)' : ' (no decay data for them)')
+      : '') +
     '.';
   const m = $('#decMsg');
   if (m) m.textContent = DEC.msg;

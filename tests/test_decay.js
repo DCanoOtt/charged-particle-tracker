@@ -39,14 +39,35 @@ const { DEC, decName, decPrefetch, dkLoadFiles, dkSolve, dkInfo, dkInternal, par
   const sec = (ZA, liso, T, rtyp, rfs, br) => [rec(ZA, 59.0, 0, liso, 0, 0, 2725, 1), rec(T, 0, 0, 0, 6, 0, 2725, 2), rec(0, 0, 0, 0, 0, 0, 2725, 3), rec(5, 1, 0, 0, 6, 1, 2725, 4), rec(rtyp, rfs, 2.8e6, 0, br, 0, 2725, 5)].join('\n');
   const m = new Map(), n = parseEndfDecay(sec(27060, 0, 1.66e8, 1, 0, 1) + '\n' + ' '.repeat(66) + '2725 8  0    99999\n' + sec(27058, 1, 3.2e4, 3, 0, 1), m);
   assert.strictEqual(n, 2); assert.ok(Math.abs(m.get(270600).T / 1.66e8 - 1) < 1e-5); assert.strictEqual(m.get(270600).br[0].d, 280600); assert.strictEqual(m.get(270581).br[0].d, 270580); assert.strictEqual(m.get(270581).br[0].lab, 'IT');
+  { const mc = new Map(), nc = parseEndfDecay((sec(27060, 0, 1.66e8, 1, 0, 1) + '\n' + ' '.repeat(66) + '2725 8  0    99999\n' + sec(27058, 1, 3.2e4, 3, 0, 1)).replace(/\n/g, '\r\n'), mc); assert.strictEqual(nc, 2, 'CRLF line endings (a single .txt file)'); assert.ok(mc.has(270600)); }
+  { const mb = new Map(); parseEndfDecay(sec(27060, 0, 1.66e8, 1, 0, 1).replace(/^(.{66})2725/gm, '$1BAD!').replace('2725', '2725'), mb); }
   // lazy loading: only the files of the nuclides in the chain are read
   assert.strictEqual(decName('dec-027_Co_060.endf'), 270600); assert.strictEqual(decName('Te127m.dat'), 521271); assert.strictEqual(decName('Co-58m1.endf'), 270581); assert.strictEqual(decName('big-library.endf'), null);
   const txt60 = sec(27060, 0, 1.66e8, 1, 0, 1), reads = [], mk = (nm, tx) => ({ name: nm, size: tx.length, text: async () => { reads.push(nm); return tx; } });
   globalThis.$ = () => null; globalThis.actRender = () => { }; globalThis.saveLocal = () => { };
   await dkLoadFiles([mk('dec-027_Co_060.endf', txt60), mk('dec-026_Fe_056.endf', txt60), mk('dec-028_Ni_060.endf', txt60)], 'lib');
-  assert.strictEqual(DEC.idx.size, 3); assert.strictEqual(reads.length, 0, 'nothing read on loading');
+  assert.strictEqual(DEC.idx.size, 3); assert.deepStrictEqual(reads, ['dec-027_Co_060.endf'], 'only the reference nuclide for the intensity units is read on loading');
   await decPrefetch([270600], true);
   assert.deepStrictEqual(reads, ['dec-027_Co_060.endf'], 'only Co-60 read (Ni-60 is stable, Fe-56 not needed)'); assert.strictEqual(DEC.nread, 1); assert.ok(DEC.map.has(270600));
+  // units of the intensities: a pure β+ emitter (only the 511 keV annihilation line, RI in per cent = 199.9) is read lazily; the library is per cent because Co-60 (99.85) is a reference file
+  {
+    const fl = v => (v === 0 ? ' 0.000000+0' : v.toExponential(6).replace(/e([+-])(\d+)/, (m, s, d) => s + String(+d))).padStart(11), it = v => String(v).padStart(11);
+    const R = (cells, mat, ln) => cells.join('') + String(mat).padStart(4) + ' 8457' + String(ln).padStart(5);
+    const gsec = (ZA, liso, T, rtyp, gl, ann) => {
+      const o = []; let n = 0; const add = cells => o.push(R(cells, 2799, ++n));
+      add([fl(ZA), fl(59), it(0), it(liso), it(0), it((gl.length ? 1 : 0) + (ann ? 1 : 0))]); add([fl(T), fl(0), it(0), it(0), it(6), it(0)]); add([fl(0), fl(0), fl(0), fl(0), fl(0), fl(0)]);
+      add([fl(5), fl(1), it(0), it(0), it(6), it(1)]); add([fl(rtyp), fl(0), fl(2.8e6), fl(0), fl(1), fl(0)]);
+      if (gl.length) { add([fl(0), fl(0), it(0), it(0), it(6), it(gl.length)]); add([fl(1), fl(0), fl(0), fl(0), fl(0), fl(0)]); for (const [E, ri] of gl) { add([fl(E), fl(0), it(0), it(0), it(6), it(0)]); add([fl(0), fl(0), fl(ri), fl(0), fl(0), fl(0)]); } }
+      if (ann) { add([fl(0), fl(9), it(0), it(0), it(6), it(1)]); add([fl(1), fl(0), fl(0), fl(0), fl(0), fl(0)]); add([fl(511000), fl(0), it(0), it(0), it(6), it(0)]); add([fl(0), fl(0), fl(ann), fl(0), fl(0), fl(0)]); }
+      return o.join('\n');
+    };
+    const co = gsec(27060, 0, 1.66e8, 1, [[1332500, 99.85], [1173200, 99.98]], 0), si = gsec(14027, 0, 4.16, 2, [], 199.9);
+    const direct = new Map(); parseEndfDecay(co, direct); assert.ok(direct.get(270600).gam && direct.get(270600).gam.length === 2, 'synthetic gamma record parsed');
+    const d2 = new Map(); parseEndfDecay(si, d2); assert.ok(d2.get(140270).ann > 100, 'synthetic annihilation record parsed (raw per cent)');
+    await dkLoadFiles([mk('dec-027_Co_060.endf', co), mk('dec-014_Si_027.endf', si)], 'lib2');
+    await decPrefetch([140270], true);
+    const e = DEC.map.get(140270); assert.ok(e && Math.abs(e.ann - 1.999) < 1e-6, 'annihilation intensity of Si-27 per decay: ' + (e && e.ann)); assert.ok(Math.abs(e.gam[0][1] - 1.999) < 1e-6);
+  }
   const cs = dkInternal(551370); assert.strictEqual(cs.br[0].d, 561371); assert.ok(Math.abs(cs.br[0].f - 0.944) < 1e-3); assert.strictEqual(dkInternal(561371).br[0].d, 561370); assert.strictEqual(dkInternal(561371).br[0].lab, 'IT');
   assert.ok(Math.abs(dkInternal(471101).T / (249.76 * 86400) - 1) < 1e-4, 'Ag-110m'); assert.ok(dkInternal(471101).br.some(b => b.d === 471100));
   assert.ok(dkInternal(500500) === null || true); assert.ok(dkInternal(290640) && dkInternal(290640).st === 'rad', 'Cu-64 from internal data');

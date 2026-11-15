@@ -405,6 +405,18 @@ with sync_playwright() as p:
     mu = pg.evaluate("""()=>{const R=MEAS.res, c=R.C[0]; let ok=true, any=false, dev=0; for(let k=0;k<R.N;k++){ if(Math.abs(c.sig[k]-Math.hypot(c.sigStat[k],c.sigSys[k]))>1e-9*(1+c.sig[k])) ok=false; if(c.sigSys[k]>0) any=true; if(Math.abs(c.net[k])>0 && Math.abs(c.sigSys[k]/Math.abs(c.net[k])-Math.hypot(0.1,0.05))>1e-9) dev++; } return {ok, any, dev, bm:R.m.bmode, noise:c.tot.some(v=>v!==Math.round(v))}}""")
     check('systematic uncertainties (beam current 10 %, efficiency 5 %) are added in quadrature to the statistical one', mu['ok'] and mu['any'] and mu['dev'] == 0, mu)
     check('Poisson noise gives integer counts; background model B runs', not mu['noise'] and mu['bm'] == 'exp', mu)
+    pg.evaluate("()=>{const s=irrSet().meas; s.noise=false; s.pile=false; s.I=''; s.IU=''; s.q=''}"); pg.click('#measRun'); pg.wait_for_function("MEAS.res && !MEAS.busy && MEAS.res.m.I===''", timeout=120000)
+    b0 = pg.evaluate("()=>({net:Array.from(MEAS.res.C[0].net), rate:measBeam(MEAS.res.m).rate, fld:['I','IU','q'].map(k=>!!document.querySelector('#measWin [data-mk='+k+']')), note:/maximum total pulse rate/.test(document.querySelector('#measOut').innerText)})")
+    pg.evaluate("()=>{const s=irrSet().meas; s.I=irrSet().I/10; s.IU=irrSet().IU}"); pg.click('#measRun'); pg.wait_for_function("MEAS.res && !MEAS.busy && MEAS.res.m.I!==''", timeout=120000)
+    b1 = pg.evaluate("()=>Array.from(MEAS.res.C[0].net)")
+    mx = max(abs(b1[k]*10 - b0['net'][k]) / (1 + abs(b0['net'][k])) for k in range(len(b1)))
+    check('measurement window has beam current, unit and charge state; counts scale with the beam (no pile-up here → ×0.1)', all(b0['fld']) and b0['note'] and mx < 0.05, [b0['fld'], b0['note'], mx])
+    pg.evaluate("()=>{const s=irrSet().meas; s.I=''; s.IU=''; s.pile=true}")
+    pg.evaluate("()=>{window._m0=JSON.parse(JSON.stringify(irrSet().meas)); irrSet().meas.brate=77; irrSet().meas.tirr=9}"); pg.click('[data-mreset]'); pg.wait_for_selector('#measRun', timeout=60000)
+    rs = pg.evaluate("()=>{const m=irrSet().meas; return [m.brate, m.tirr]}")
+    check('“Reset this window to the defaults” restores the default settings', rs[0] == 5 and rs[1] != 9, rs)
+    pg.evaluate("()=>{irrSet(); S.irr.meas=window._m0; MEAS.res=null; MEAS.z={}; return measOpen()}"); pg.wait_for_selector('#measRun', timeout=60000); pg.wait_for_timeout(500)
+    pg.evaluate("()=>{const s=irrSet().meas; s.noise=false; s.dI=10; s.dE=5; s.bmode='exp'; s.newSeed=false; s.seed=7}"); pg.click('#measRun'); pg.wait_for_function("MEAS.res && !MEAS.busy && MEAS.res.m.dI===10", timeout=120000)
     pg.evaluate("()=>{const s=irrSet().meas; s.noise=false; window._cn=null}"); pg.click('#measRun'); pg.wait_for_function("MEAS.res && !MEAS.busy && MEAS.res.m.noise===false && MEAS.res.m.dI===10", timeout=120000)
     pg.evaluate("()=>{const c=MEAS.res.C[0]; window._cn={net:Array.from(c.net), tot:Array.from(c.tot), sys:Array.from(c.sigSys)}}")
     pg.evaluate("()=>{const s=irrSet().meas; s.dI=0; s.dE=0}"); pg.click('#measRun'); pg.wait_for_function("MEAS.res && !MEAS.busy && MEAS.res.m.dI===0", timeout=120000)
@@ -423,7 +435,7 @@ with sync_playwright() as p:
     # γ spectrum of a time range
     pg.evaluate("()=>{const s=irrSet().meas; s.bmode='cont'; s.noise=false; s.layF='all'; s.newSeed=false; s.dI=0; s.dE=0; s.sel={}}"); pg.evaluate("()=>{measLayerChanged()}"); pg.wait_for_timeout(300)
     pg.click('#measRun'); pg.wait_for_function("MEAS.res && !MEAS.busy && MEAS.res.m.bmode==='cont'", timeout=120000)
-    pg.click('[data-mpick]'); pb = pg.evaluate("(()=>{const sv=document.querySelector('#measChart svg'), g=MEAS.geom, r=sv.getBoundingClientRect(), k=r.width/g.W; return [r.left+(g.m.l+g.iw*0.25)*k, r.top+(g.m.t+g.ih*0.5)*k, r.left+(g.m.l+g.iw*0.75)*k]})()")
+    pg.click('[data-mpick]'); pg.evaluate("()=>document.querySelector('#measChart').scrollIntoView({block:'center'})"); pg.wait_for_timeout(200); pb = pg.evaluate("(()=>{const sv=document.querySelector('#measChart svg'), g=MEAS.geom, r=sv.getBoundingClientRect(), k=r.width/g.W; return [r.left+(g.m.l+g.iw*0.25)*k, r.top+(g.m.t+g.ih*0.5)*k, r.left+(g.m.l+g.iw*0.75)*k]})()")
     pg.mouse.move(pb[0], pb[1]); pg.mouse.down(); pg.mouse.move(pb[2], pb[1], steps=6); pg.mouse.up(); pg.wait_for_timeout(600)
     sp = pg.evaluate("""()=>{const S=MEAS.spec, R=MEAS.res; if(!S) return null; let pk=0, bk=0; for(let c=0;c<S.nch;c++){pk+=S.peaks[c]; bk+=S.bkg[c];}
       const g=R.g, eff=gamEffFn(g); let exp=0; for(const li of R.keys){ const so=R.sols[li], D=gamDecays(so,R.prods[li],R.Tirr,S.t1,S.t2).D; so.ids.forEach((id,i)=>{const e=so.info[i]; if(e&&e.gam) for(const l of e.gam) exp+=D[i]*l[1]*eff(l[0]);}); }
@@ -513,6 +525,8 @@ with sync_playwright() as p:
     stale = pg.evaluate("(()=>{S.tab='endf';renderPlots(true);return /another projectile|Load the proton/.test(document.body.innerText)})()")
     check('results of another projectile are not folded with this library', stale)
 
+    dr = pg.evaluate("()=>{DEC.map.set(1,{}); DEC.idx.set(1,{}); ENS.map.set(1,{}); MEAS.list=[1]; const n0=ACTP.size; decResetAll(); return [n0>0, DEC.map.size, DEC.idx.size, ENS.map.size, ACTP.size, MEAS.list.length, MEAS.res]}")
+    check('loading a new decay database discards the old decay data and the results computed from them', dr[0] and dr[1:6] == [0, 0, 0, 0, 0] and dr[6] is None, dr)
     check('no page errors', not [e for e in errs if 'ERR_TUNNEL' not in e], errs[:2])
     b.close()
 sys.exit(1 if fails else 0)

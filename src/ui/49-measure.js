@@ -21,6 +21,9 @@ const MEAS_DEF = {
   bmode: 'cont',
   brate: BKG_R0,
   bL: 500,
+  I: '',
+  IU: '',
+  q: '',
   bEc: BKG_EC,
   bpk: BKG_PEAKS,
   noise: true,
@@ -46,11 +49,13 @@ const MEAS_DEF = {
   sel: {}
 };
 let MEAS = { res: null, hidden: {}, z: {}, sol0: null, list: [], busy: false };
+const MEAS_VER = 2;
 function measSet() {
   // persistent settings object (mutated in place, so references stay valid)
   const st = irrSet(),
     t0 = +st.tirr > 0 ? +st.tirr : 1;
-  if (!st.meas) st.meas = { tU: st.tirrU || 'h', tirr: t0, tcool: +st.tcool > 0 ? +st.tcool : 4 * t0 };
+  if (st.meas && st.meas.ver !== MEAS_VER) st.meas = null; // settings saved by an older version of the window are discarded once (they can hold values that no longer mean the same)
+  if (!st.meas) st.meas = { ver: MEAS_VER, tU: st.tirrU || 'h', tirr: t0, tcool: +st.tcool > 0 ? +st.tcool : 4 * t0 };
   const m = st.meas;
   if (m.tcU === undefined) m.tcU = m.tU || 'h';
   if (m.ppuC === undefined) m.ppuC = m.ppu !== undefined ? m.ppu : MEAS_DEF.ppu;
@@ -234,6 +239,24 @@ function measSelChanged() {
       ? 'The selection of γ lines has changed: press “Simulate Experiment” to update the plots.'
       : 'No γ line selected: select at least one isotope and γ line (button “Select isotopes and γ lines”).';
 }
+function measBeam(m) {
+  // beam of the measurement: empty fields = the values of the activation panel; → { I, IU, q, rate (primaries/s), f (factor on the production rates) }
+  const a = irrSet(),
+    I = m.I !== '' && m.I != null && +m.I >= 0 ? +m.I : +a.I,
+    IU = m.IU || a.IU || 'pps',
+    q = +m.q > 0 ? +m.q : +a.q > 0 ? +a.q : null,
+    Z = PJ().Z,
+    rate = IU === 'pps' ? I : (I * ACT_IU[IU]) / ((q || Z) * ACT_E);
+  return { I, IU, q, rate };
+}
+function measProd(li, m) {
+  // production rates of the layer scaled to the beam current of the measurement window (everything is linear in the beam)
+  const Q = ACTP.get(li).Q,
+    b = measBeam(m);
+  if (!(Q.rate > 0) || !(b.rate >= 0) || Math.abs(b.rate / Q.rate - 1) < 1e-12) return Q.prod;
+  const f = b.rate / Q.rate;
+  return new Map(Array.from(Q.prod, ([k, v]) => [k, v * f]));
+}
 function measEffInfo(g) {
   const eff = gamEffFn(g),
     et = gamEffTotFn(g),
@@ -298,7 +321,8 @@ async function measRun() {
   await new Promise(r => setTimeout(r, 20));
   try {
     const sols = {};
-    for (const li of keys) sols[li] = await dkSolve(Object.assign({}, ACTP.get(li).Q, { Tirr, Tc, extra: edges.slice(1, N) }));
+    for (const li of keys) sols[li] = await dkSolve(Object.assign({}, ACTP.get(li).Q, { prod: measProd(li, m), Tirr, Tc, extra: edges.slice(1, N) }));
+    const prodM = Object.fromEntries(keys.map(li => [li, measProd(li, m)]));
     const seed = m.newSeed ? (Math.random() * 4e9) >>> 0 : +m.seed >>> 0,
       rnd = measRng(seed),
       dI = Math.max(0, +m.dI || 0) / 100,
@@ -364,7 +388,8 @@ async function measRun() {
         iOther: z(),
         sigStat: z(),
         sigSys: z(),
-        rate: z()
+        rate: z(),
+        dmax: 0
       });
     });
     for (let k = 0; k < N; k++) {
@@ -373,7 +398,7 @@ async function measRun() {
         t2e = 0,
         pulses = 0;
       keys.forEach((li, q) => {
-        const r = gamDecays(sols[li], ACTP.get(li).Q.prod, Tirr, edges[k], edges[k + 1]);
+        const r = gamDecays(sols[li], prodM[li], Tirr, edges[k], edges[k + 1]);
         Ds[li] = r.D;
         if (q === 0) {
           t1e = r.t1e;
@@ -412,13 +437,14 @@ async function measRun() {
         c.thNet[k] = (S0 + io) * puFth;
         c.thTot[k] = c.thNet[k] + (m.thBkg ? Bk : 0);
         c.sTrue[k] = S;
+        if (Ds[c.li][c.idx] > c.dmax) c.dmax = Ds[c.li][c.idx];
         c.iOther[k] = io;
       }
     }
     MEAS.res = {
       keys,
       sols,
-      prods: Object.fromEntries(keys.map(li => [li, ACTP.get(li).Q.prod])),
+      prods: prodM,
       edges,
       live: Float64Array.from(C[0].t1, (v, k) => C[0].t2[k] - v),
       puLoss: Float64Array.from(C[0].pu, v => v / 100),
@@ -643,9 +669,108 @@ function measDraw() {
     '·FWHM (keV)</th><th>peak in ROI (%)</th><th>background in ROI (cps)</th><th>Σ net counts</th><th>max pile-up (%)</th></tr></thead><tbody>' +
     rows +
     '</tbody></table></div>' +
+    measSatNote(R) +
+    measZeroNote(R) +
     '<div id="measSpec"></div>';
   measAttach();
   measSpecDraw();
+}
+function measZeroNote(R) {
+  // explains why the expected signal of a line is zero in every bin
+  const out = [];
+  for (const c of R.C) {
+    let smax = 0;
+    for (let k = 0; k < R.N; k++) if (c.sTrue[k] > smax) smax = c.sTrue[k];
+    if (smax > 0) continue;
+    const why = [];
+    if (c.idx < 0) why.push('the nuclide is not in the solved decay chain (index −1)');
+    else if (!(c.dmax > 0)) why.push('no decays of this nuclide in any time bin (decays per bin = ' + c.dmax + ')');
+    if (!(c.I > 0)) why.push('γ intensity I = ' + c.I);
+    if (!(c.ep > 0)) why.push('peak efficiency ε = ' + c.ep + ' at ' + fmt(c.E, 6) + ' keV (Ge/DAQ configuration)');
+    if (!(c.cov > 0)) why.push('ROI covers ' + c.cov + ' of the peak (resolution σ = ' + fmt(measSigma(c.E, R.g), 4) + ' keV)');
+    out.push('<li>' + esc(measNm(c)) + ' ' + fmt(c.E, 6) + ' keV: ' + (why.length ? why.join('; ') : 'unknown reason') + '</li>');
+  }
+  // zero or non-finite counts of the run (any line)
+  let st = 0,
+    sb = 0,
+    bad = 0,
+    lmin = Infinity,
+    lmax = 0;
+  for (const c of R.C)
+    for (let k = 0; k < R.N; k++) {
+      st += c.tot[k];
+      sb += c.bkg[k];
+      if (!isFinite(c.tot[k]) || !isFinite(c.rate[k]) || !isFinite(c.bkgExp[k])) bad++;
+    }
+  for (let k = 0; k < R.N; k++) {
+    lmin = Math.min(lmin, R.live[k]);
+    lmax = Math.max(lmax, R.live[k]);
+  }
+  const zero = !(st > 0) || bad > 0 || !(lmin > 1e-6);
+  const diag = zero
+    ? '<div class="warn"><b>Diagnostic (all counts are zero or not finite):</b> Σ total counts = ' +
+      st +
+      ', Σ background counts = ' +
+      sb +
+      ', non-finite values = ' +
+      bad +
+      ', live time per bin: min ' +
+      fmt(lmin, 4) +
+      ' s, max ' +
+      fmt(lmax, 4) +
+      ' s, background rate in the ROI of the first line = ' +
+      fmt(R.C[0].bkgRate, 4) +
+      ' cps, background total = ' +
+      fmt(R.bk.total, 4) +
+      ' cps, efficiency ε(first line) = ' +
+      fmt(R.C[0].ep, 4) +
+      ', FWHM = ' +
+      fmt(R.C[0].fw, 4) +
+      ' keV.</div>'
+    : '';
+  return diag + (out.length ? '<div class="warn"><b>Expected signal is exactly zero for:</b><ul>' + out.join('') + '</ul></div>' : '');
+}
+function measSatNote(R) {
+  // warning when the detector is saturated by the pile-up (the paralysable dead-time factor exp(−2Rτ) tends to zero)
+  let rmax = 0,
+    pmax = 0,
+    nsat = 0;
+  const c0 = R.C[0],
+    k0 = R.NI < R.N ? R.NI : 0; // only the cooling bins count for the warning (the beam is on during the irradiation); without a cooling phase all bins are listed but no warning is given
+  for (let k = k0; k < R.N; k++) {
+    if (c0.rate[k] > rmax) rmax = c0.rate[k];
+    if (c0.pu[k] > pmax) pmax = c0.pu[k];
+    if (R.NI < R.N && c0.pu[k] > 99) nsat++;
+  }
+  const b = measBeam(R.m),
+    tau = Math.max(0, +R.g.tau || 0);
+  return (
+    '<p class="' +
+    (nsat ? 'warn' : 'hint') +
+    '">Beam ' +
+    fmt(b.I, 4) +
+    ' ' +
+    esc(b.IU) +
+    (b.q ? ', q = ' + b.q : '') +
+    ' (' +
+    fmt(b.rate, 4) +
+    ' primaries/s) · maximum total pulse rate in the detector ' +
+    (k0 ? 'during the cooling ' : '') +
+    fmt(rmax, 4) +
+    ' counts/s with τ = ' +
+    fmt(tau, 3) +
+    ' µs → pile-up loss up to ' +
+    fmt(pmax, 4) +
+    ' %' +
+    (nsat
+      ? ' · <b>' +
+        nsat +
+        ' of ' +
+        (R.N - R.NI) +
+        ' cooling bins are saturated (loss above 99 %)</b>: the peak counts there vanish because the detector is blind. Reduce the beam current or the efficiency (distance) or the pulse width, or start counting later.'
+      : '') +
+    '</p>'
+  );
 }
 function measCtx() {
   const R = MEAS.res;
@@ -953,6 +1078,33 @@ function measBuild() {
     '<div class="mbox" style="width:min(1200px,100%)"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><h3>Simulate a decay measurement (HPGe)</h3><button class="btn sm" data-mclose>Done</button></div>' +
     '<p class="hint">Counts of selected γ lines in an HPGe detector, in time bins during the irradiation and the cooling. Source: the production rates and decay chains of every layer of the activation calculation (beam current of that panel), solved with the Bateman equations at every bin edge. The detector counts the chosen layer or all layers together: the pile-up and the γ spectrum depend on the total counting rate of all γ lines of those layers.</p>' +
     '<div class="mgrid">' +
+    fld(
+      'Beam current (empty = as in the activation panel)',
+      '<input type="number" data-mk="I" step="any" min="0" value="' + (m.I === '' ? '' : m.I) + '" placeholder="' + esc(String(irrSet().I)) + '">'
+    ) +
+    fld(
+      'Current unit',
+      '<select data-mk="IU">' +
+        [
+          ['', 'as in the activation panel (' + (irrSet().IU || 'pps') + ')'],
+          ['pps', 'particles / s'],
+          ['pA', 'pA'],
+          ['nA', 'nA'],
+          ['uA', 'µA'],
+          ['mA', 'mA']
+        ]
+          .map(x => '<option value="' + x[0] + '"' + (String(m.IU) === x[0] ? ' selected' : '') + '>' + x[1] + '</option>')
+          .join('') +
+        '</select>'
+    ) +
+    fld(
+      'Charge state q of the ions (e), empty = activation panel',
+      '<input type="number" data-mk="q" step="1" min="1" value="' +
+        (m.q === '' ? '' : m.q) +
+        '" placeholder="' +
+        esc(String(irrSet().q || 'fully stripped')) +
+        '">'
+    ) +
     fld('Irradiation time', nI('tirr', 'min="0"')) +
     fld('Irradiation time unit', sel('tU', actUnits)) +
     fld('Points per irradiation time unit', nI('ppu', 'min="0.01"')) +
@@ -964,7 +1116,7 @@ function measBuild() {
     fld('Beam-current uncertainty (%, relative)', nI('dI', 'min="0" step="any"')) +
     fld('Ge efficiency uncertainty (%, relative)', nI('dE', 'min="0" step="any"')) +
     '</div>' +
-    '<div class="btns"><button class="btn pri" data-msel>Select isotopes and γ lines</button><span class="hint" id="measSelSum"></span><button class="btn pri" data-gecfg>Configure the Ge detector and DAQ</button><span class="hint" data-gcsum>' +
+    '<div class="btns"><button class="btn pri" data-msel>Select isotopes and γ lines</button><span class="hint" id="measSelSum"></span><button class="btn pri" data-gecfg>Configure the Ge detector and DAQ</button><button class="btn" data-mreset title="Deletes the saved settings of this window (time, beam, background, statistics) and restores the defaults">Reset this window to the defaults</button><span class="hint" data-gcsum>' +
     esc(gamCfgSummary(g)) +
     '</span></div>' +
     '<h4>Background</h4><div class="mgrid">' +
@@ -1218,6 +1370,15 @@ function measOnCfg() {
   if (MEAS.res) measLater(500);
 }
 document.addEventListener('click', async ev => {
+  if (ev.target.closest('[data-mreset]')) {
+    irrSet();
+    delete S.irr.meas;
+    MEAS.res = null;
+    MEAS.z = {};
+    saveLocal();
+    measOpen();
+    return;
+  }
   if (ev.target.closest('[data-measopen]')) {
     measOpen();
     return;
@@ -1422,7 +1583,7 @@ document.addEventListener('change', ev => {
     measDraw();
     return;
   }
-  if (k === 'tirr' || k === 'tcool' || k === 'tU' || k === 'tcU') {
+  if (k === 'tirr' || k === 'tcool' || k === 'tU' || k === 'tcU' || k === 'I' || k === 'IU' || k === 'q') {
     MEAS.z = {};
     measPrep().then(() => {
       measSelSummary();

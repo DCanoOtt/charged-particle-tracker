@@ -213,7 +213,7 @@ async function actCompute(my) {
       gm,
       hasGam,
       unit: atoms ? 'atoms' : gm ? 'γ/s' : xm ? 'X/s' : bm ? 'β/s' : 'Bq',
-      Q: { prod, info, Tirr, Tc, chain: !!s.chain },
+      Q: { prod, info, Tirr, Tc, chain: !!s.chain, rate },
       o: {
         series,
         xlabel: 'Time since the start of the irradiation (' + { s: 's', min: 'min', h: 'hours', d: 'days', y: 'years' }[uT] + ')',

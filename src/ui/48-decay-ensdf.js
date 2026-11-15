@@ -418,23 +418,9 @@ async function ensLoadFiles(files, name) {
   }
 }
 async function ensLoadFiles0(files, name) {
-  Object.assign(ENS, {
-    idx: new Map(),
-    done: new Set(),
-    con: new Map(),
-    iso: new Map(),
-    stab: new Set(),
-    map: new Map(),
-    miss: new Set(),
-    nread: 0,
-    readA: [],
-    nuc: 0,
-    name,
-    busy: true,
-    prog: '',
-    msg: '',
-    rest: 0
-  });
+  decResetAll();
+  ENS.name = name;
+  ENS.busy = true;
   const rest = [];
   for (const f of files) {
     if (/\.(png|jpe?g|gif|pdf|zip|gz|html?|tendl|endf)$/i.test(f.name)) continue;
@@ -466,6 +452,7 @@ async function ensLoadFiles0(files, name) {
   if (ENS.nuc) irrSet().src = 'ens';
   saveLocal();
   actRender();
+  if (ENS.nuc) actUpdate();
 }
 async function ensReadId(id) {
   // reads the mass chains A−5 … A that contain decays of this parent and builds its entry

@@ -356,24 +356,63 @@ function decName(fname) {
   const iso = m[3] ? (/^m\d+$/i.test(m[3]) ? +m[3].slice(1) : /^n$/i.test(m[3]) ? 2 : 1) : 0;
   return (Z * 1000 + A) * 10 + Math.min(9, iso);
 }
+function decResetAll() {
+  // a new decay database replaces everything: the parsed decay data of both libraries (ENDF-6 and ENSDF) and every result computed from them are discarded
+  Object.assign(DEC, { map: new Map(), idx: new Map(), miss: new Set(), nread: 0, files: 0, nuc: 0, name: '', busy: false, prog: '', msg: '' });
+  if (typeof ENS !== 'undefined')
+    Object.assign(ENS, {
+      idx: new Map(),
+      done: new Set(),
+      con: new Map(),
+      iso: new Map(),
+      stab: new Set(),
+      map: new Map(),
+      miss: new Set(),
+      nread: 0,
+      readA: [],
+      nuc: 0,
+      name: '',
+      busy: false,
+      prog: '',
+      msg: '',
+      rest: 0
+    });
+  DK_INT.clear();
+  if (typeof ACTP !== 'undefined') ACTP.clear();
+  if (typeof ACT_GEN !== 'undefined') ACT_GEN++;
+  if (typeof MEAS !== 'undefined') Object.assign(MEAS, { res: null, list: [], z: {}, spec: null, slice: null });
+  for (const id of ['gamWin', 'measWin', 'measSelWin']) {
+    const w = document.getElementById && document.getElementById(id);
+    if (w) w.hidden = true;
+  }
+}
 async function dkLoadFiles(files, name) {
+  try {
+    await dkLoadFiles0(files, name);
+  } catch (e) {
+    DEC.busy = false;
+    DEC.prog = '';
+    DEC.msg = 'Reading the decay files failed: ' + ((e && e.message) || e);
+    actRender();
+  }
+}
+async function dkLoadFiles0(files, name) {
   // files: File[] (a folder, several files or one big file)
+  decResetAll();
   DEC.busy = true;
-  DEC.map = new Map();
-  DEC.idx = new Map();
-  DEC.miss = new Set();
-  DEC.nread = 0;
-  DEC.files = 0;
-  DEC.nuc = 0;
   DEC.name = name;
-  DEC.msg = '';
-  const rest = [];
+  const rest = [],
+    st = { n: files.length, skip: 0, big: 0, err: '', fail: 0, ex: files.slice(0, 3).map(f => f.name) };
   for (const f of files) {
-    if (/\.(png|jpe?g|gif|pdf|zip|gz|html?|tendl)$/i.test(f.name)) continue;
+    if (/\.(png|jpe?g|gif|pdf|zip|gz|html?|tendl)$/i.test(f.name)) {
+      st.skip++;
+      continue;
+    }
     const id = decName(f.name);
     if (id) {
       if (!DEC.idx.has(id)) DEC.idx.set(id, f);
     } else if (f.size < 2e8) rest.push(f);
+    else st.big++;
   }
   let k = 0,
     t0 = Date.now();
@@ -388,7 +427,10 @@ async function dkLoadFiles(files, name) {
     }
     try {
       if (parseEndfDecay(await f.text(), DEC.map)) DEC.files++;
-    } catch (e) {}
+    } catch (e) {
+      st.fail++;
+      if (!st.err) st.err = (e && e.message) || String(e);
+    }
   }
   DEC.nuc = DEC.idx.size + DEC.map.size;
   DEC.busy = false;
@@ -400,10 +442,25 @@ async function dkLoadFiles(files, name) {
       '”' +
       (DEC.map.size ? ' and ' + DEC.map.size.toLocaleString('en') + ' nuclides read from files without a nuclide name' : '') +
       ' (ENDF-6, MF 8 / MT 457). A file is read only when its nuclide appears in the chains.'
-    : 'No ENDF-6 decay data (MF 8, MT 457) found in “' + name + '”.';
+    : 'No ENDF-6 decay data (MF 8, MT 457) found in “' +
+      name +
+      '”. Files received: ' +
+      st.n +
+      (st.n ? ' (e.g. ' + st.ex.join(', ') + ')' : ' — the file dialog returned no files') +
+      '; skipped by extension: ' +
+      st.skip +
+      '; larger than 200 MB: ' +
+      st.big +
+      '; read without finding MT 457: ' +
+      (rest.length - st.fail) +
+      '; could not be read: ' +
+      st.fail +
+      (st.err ? ' (' + st.err + ')' : '') +
+      '.';
   if (DEC.nuc) irrSet().src = 'file';
   saveLocal();
   actRender();
+  if (DEC.nuc) actUpdate();
 }
 async function decReadId(id) {
   const f = DEC.idx.get(id);

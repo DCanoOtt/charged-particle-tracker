@@ -247,15 +247,7 @@ document.addEventListener('click', ev => {
     );
   } else if (t.id === 'setupLoad') loadSetupText($('#setupTxt').value, '#setupMsg');
   else if (t.id === 'setupSave') {
-    const nm =
-      (
-        S.layers
-          .map(l => l.def && l.def.name)
-          .filter(Boolean)
-          .join('_') || 'setup'
-      )
-        .replace(/[^\w.-]+/g, '_')
-        .slice(0, 50) + '.setup.json';
+    const nm = setupFileName();
     saveFile(nm, setupJSON(), 'setup', '#setupMsg2');
   } else if (t.id === 'setupOpen') $('#setupFile').click();
   else if (t.id === 'setupReset') {

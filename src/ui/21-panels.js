@@ -122,10 +122,35 @@ function renderSetup() {
   $('#gSetup').innerHTML =
     '<h2>Setup</h2><div class="btns" style="margin:8px 0"><button class="btn sm" id="setupSave">Save setup to file</button><button class="btn sm" id="setupOpen">Load setup from file…</button><input type="file" id="setupFile" accept=".json,application/json,text/plain" hidden></div><p class="hint" id="setupMsg2"></p><details><summary>Copy / paste the setup as JSON text</summary><div style="display:flex;flex-direction:column;gap:8px;margin-top:10px"><textarea id="setupTxt" spellcheck="false" placeholder="Paste a saved setup here, then press Load"></textarea><div class="btns"><button class="btn sm" id="setupCopy">Copy current</button><button class="btn sm" id="setupLoad">Load pasted</button><button class="btn sm" id="setupReset">Reset all</button></div><p class="hint" id="setupMsg"></p></div></details><p class="hint">Settings and your saved materials are remembered in this browser.</p>';
 }
+function setupLayerSummary(l, i) {
+  // one human-readable record per layer, in the order of the stack: chemical symbols, thickness, unit, phase (s / l / g)
+  const d = l.def || {},
+    rows = (d.rows || []).filter(r => r && r.sym),
+    atoms = d.mode === 'atoms';
+  return {
+    layer: i + 1,
+    material: d.name || '',
+    symbols: rows.map(r => r.sym + (atoms && +r.amt !== 1 && isFinite(+r.amt) ? +r.amt : '')).join(''),
+    thickness: l.t,
+    unit: l.tu,
+    phase: { solid: 's', liquid: 'l', gas: 'g' }[d.phase] || ''
+  };
+}
+function setupFileName() {
+  // layers in stack order: symbols + thickness + unit + phase (s/l/g), joined by “_”, then the code version; e.g. Si100um-s_Ar1cm-g_v0.1.3.setup.json
+  const part = (l, i) => {
+    const q = setupLayerSummary(l, i),
+      u = String(q.unit).replace(/µ/g, 'u').replace(/²/g, '2').replace(/\//g, '-');
+    return (q.symbols || 'gap') + +(+q.thickness).toPrecision(6) + u + (q.phase ? '-' + q.phase : '');
+  };
+  return (S.layers.map(part).join('_') || 'setup').replace(/[^\w.-]+/g, '_').slice(0, 120) + '_v' + APP_VERSION + '.setup.json';
+}
 function setupJSON() {
   return JSON.stringify(
     {
       app: 'charged-particle-tracker',
+      codeVersion: APP_VERSION,
+      layerSummary: S.layers.map(setupLayerSummary),
       v: 1,
       layers: S.layers.map(l => ({ t: l.t, tu: l.tu, def: l.def })),
       beam: S.beam,

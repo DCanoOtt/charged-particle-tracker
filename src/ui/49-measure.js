@@ -1011,28 +1011,100 @@ function measAttach() {
 }
 
 // ---- window ----
-function measBuildBkgPreview(m, g) {
-  const bk = measBkg(m, g);
-  if (!(bk.total > 0)) return '<p class="hint">No background.</p>';
-  const x = [],
+function measBkgOpts() {
+  // options of the background-preview plot (also used for the exports)
+  const m = measSet(),
+    g = gamSet(),
+    bk = measBkg(m, g);
+  if (!(bk.total > 0)) return null;
+  const z = MEAS.bz || (MEAS.bz = {}),
+    xl = MEAS.bxl === 'log',
+    H = MEAS.bh || (MEAS.bh = {}),
+    x = [],
     y = [];
   for (let k = 0; k <= 700; k++) {
     const E = (3500 * k) / 700;
     x.push(E);
     y.push(bk.spec(E));
   }
-  const r = renderChart({
-    series: [{ name: 'background', type: 'line', x, y, color: 'var(--accent)', w: 1.6 }],
-    xlog: false,
-    ylog: true,
-    xmin: '0',
-    xmax: '3500',
+  return {
+    series: [{ name: 'background', type: 'line', x, y, color: 'var(--accent)', w: 1.6, hidden: !!H.background }],
+    xlog: xl,
+    ylog: (MEAS.byl || 'log') === 'log',
+    xmin: z.xmin || (xl ? '1' : '0'),
+    xmax: z.xmax || '3500',
+    ymin: z.ymin || '',
+    ymax: z.ymax || '',
     xlabel: 'Energy (keV)',
     ylabel: 'Background rate (counts / s / keV)',
     title: 'Background model · total ' + fmt(bk.total, 3) + ' cps',
     H: 300
-  });
-  return '<div class="chart">' + r.svg + '</div>';
+  };
+}
+function measBkgDraw() {
+  const box = $('#measBkgChart');
+  if (!box) return;
+  const o = measBkgOpts();
+  if (!o) {
+    box.innerHTML = '<p class="hint">No background.</p>';
+    return;
+  }
+  const r = renderChart(o);
+  MEAS.bo = o;
+  const top = gamRen(
+      pcTop({
+        y: ['data-gyl="bk"', MEAS.byl || 'log'],
+        x: ['data-bgxl="bk"', MEAS.bxl || 'lin'],
+        reset: ['data-gzreset="bk"', gamZoomed(MEAS.bz)]
+      }),
+      'b'
+    ),
+    leg = gamRen(gamLegend([['background', 'var(--accent)']], MEAS.bh || {}, 'bk'), 'b');
+  box.innerHTML =
+    top +
+    '<div class="chart" id="measBkgPlot">' +
+    r.svg +
+    '</div>' +
+    leg +
+    pcSave({ attr: 'data-mbsave', formats: ['png', 'pdf', 'svg', 'txt', 'csv', 'rootbin', 'root'], msg: '<span class="hint" id="measBkgMsg"></span>' });
+  gamZoom($('#measBkgPlot svg', box), r.geom, 'bz', MEAS, measBkgDraw);
+  specTip($('#measBkgPlot svg', box), r.geom, () => MEAS.bo);
+}
+async function measBkgSave(kind) {
+  const m = $('#measBkgMsg'),
+    o = measBkgOpts();
+  if (!o) return;
+  if (m) m.textContent = 'Preparing…';
+  const r = renderChart(o),
+    div = document.createElement('div');
+  div.innerHTML = r.svg;
+  const ctx = { o, geom: r.geom, svg: div.querySelector('svg'), base: 'cpt_background_spectrum', key: 'meas-bkg' },
+    old = _chart;
+  _chart = ctx;
+  try {
+    const px = expPx(),
+      base = ctx.base,
+      sel = '#measBkgMsg';
+    if (kind === 'png') await saveFile(base + '.png', await canvasBlob(await svgToCanvas(px), 'image/png'), 'PNG', sel);
+    else if (kind === 'pdf') await saveFile(base + '.pdf', await makePdf(await svgToCanvas(Math.max(px, 2400)), ctx.geom), 'PDF', sel);
+    else if (kind === 'svg') await saveFile(base + '.svg', exportSvgString(), 'SVG', sel);
+    else if (kind === 'csv') await saveFile(base + '.csv', csvOf(), 'CSV', sel);
+    else if (kind === 'txt') await saveFile(base + '.txt', asciiOf(), 'ASCII', sel);
+    else if (kind === 'root') await saveFile(base + '.C.txt', rootMacroOf(), 'ROOT macro', sel);
+    else if (kind === 'rootbin') {
+      const hs = rootHistograms(),
+        rn = base + '.root',
+        rb = RootIO.file(rn, hs),
+        inClaude = !!(window.claude && claude.use && (await claude.use('downloads')));
+      if (inClaude) await saveFile(base + '_histograms.zip', zipStore(rn, rb), 'ROOT file', sel);
+      else await saveFile(rn, new Blob([rb], { type: 'application/octet-stream' }), 'ROOT file', sel);
+      if (m) m.textContent = 'Saved ' + (inClaude ? base + '_histograms.zip (containing ' + rn + ')' : rn) + ' with ' + hs.length + ' histograms.';
+    }
+  } catch (e) {
+    if (m) m.textContent = 'Export failed: ' + ((e && e.message) || e);
+  } finally {
+    _chart = old;
+  }
 }
 function measInfoHtml() {
   const m = measSet(),
@@ -1168,8 +1240,7 @@ function measBuild() {
     '<div class="btns"><button class="btn pri" id="measRun" data-mrun style="font-size:15px;padding:9px 20px">Simulate Experiment</button><span class="hint" id="measMsg"></span></div>' +
     '<div id="measOut"></div></div>';
   measSelSummary();
-  const pv = $('#measBkgChart');
-  if (pv) pv.innerHTML = measBuildBkgPreview(m, g);
+  measBkgDraw();
   if (MEAS.res) measDraw();
 }
 function measLayerChanged() {
@@ -1365,8 +1436,7 @@ function measOnCfg() {
   const g = gamSet();
   const i = $('#measInfo');
   if (i) i.innerHTML = measInfoHtml();
-  const pv = $('#measBkgChart');
-  if (pv) pv.innerHTML = measBuildBkgPreview(measSet(), g);
+  measBkgDraw();
   if (MEAS.res) measLater(500);
 }
 document.addEventListener('click', async ev => {
@@ -1475,6 +1545,29 @@ document.addEventListener('click', async ev => {
     }
     return;
   }
+  if (ev.target.closest('[data-bgzr]')) {
+    MEAS.bz = {};
+    measBkgDraw();
+    return;
+  }
+  const bga = ev.target.closest('[data-bgall]');
+  if (bga) {
+    MEAS.bh = { background: bga.dataset.gstate === 'off' };
+    measBkgDraw();
+    return;
+  }
+  const blg = ev.target.closest('[data-bleg]');
+  if (blg) {
+    const H = MEAS.bh || (MEAS.bh = {});
+    H[blg.dataset.bleg] = !H[blg.dataset.bleg];
+    measBkgDraw();
+    return;
+  }
+  const bsv = ev.target.closest('[data-mbsave]');
+  if (bsv) {
+    measBkgSave(bsv.dataset.mbsave);
+    return;
+  }
   if (ev.target.closest('[data-sgzr]')) {
     MEAS.zs = {};
     measSpecDraw();
@@ -1535,6 +1628,20 @@ document.addEventListener('change', ev => {
     measSelRender();
     return;
   }
+  const by = ev.target.closest && ev.target.closest('#measWin [data-bgyl]');
+  if (by) {
+    MEAS.byl = by.value;
+    MEAS.bz = Object.assign({}, MEAS.bz, { ymin: '', ymax: '' });
+    measBkgDraw();
+    return;
+  }
+  const bx = ev.target.closest && ev.target.closest('#measWin [data-bgxl]');
+  if (bx) {
+    MEAS.bxl = bx.value;
+    MEAS.bz = Object.assign({}, MEAS.bz, { xmin: '', xmax: '' });
+    measBkgDraw();
+    return;
+  }
   const sy = ev.target.closest && ev.target.closest('#measWin [data-sgyl]');
   if (sy) {
     MEAS.syl = sy.value;
@@ -1587,15 +1694,13 @@ document.addEventListener('change', ev => {
     MEAS.z = {};
     measPrep().then(() => {
       measSelSummary();
-      const pv = $('#measBkgChart');
-      if (pv) pv.innerHTML = measBuildBkgPreview(measSet(), gamSet());
+      measBkgDraw();
       if (MEAS.res) measLater(50);
     });
     return;
   }
   if (k === 'bmode' || k === 'brate' || k === 'bL' || k === 'bEc' || k === 'bpk') {
-    const pv = $('#measBkgChart');
-    if (pv) pv.innerHTML = measBuildBkgPreview(measSet(), gamSet());
+    measBkgDraw();
   }
   if (k === 'roiK') {
     const i = $('#measInfo');

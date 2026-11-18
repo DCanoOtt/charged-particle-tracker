@@ -1,0 +1,36 @@
+ 60CO    ADOPTED LEVELS, GAMMAS                                  13NDS    201312
+ 60CO  L 0.0         5+                1925.28 D 14                             
+ 60CO  L 58.59      1 2+               10.467 M  6                           M  
+
+ 60CO    60FE B- DECAY                 1957RO54,2009RU08         13NDS    201312
+ 60CO  H TYP=FUL$AUT=E. BROWNE, J. K. TULI$CIT=NDS 114, 1849 (2013)$            
+ 60FE  P 0           0+                2.62E+6 Y 4              237       3     
+ 60CO  N   0.0207  3 1.0       1.0       1.0                                    
+ 60CO PN                                                                        
+ 60CO  L 0.0         5+                5.2712 Y  4                              
+ 60CO  L 58.603    7 2+                10.467 M  6                           M  
+ 60CO  B             100                 12.3                                   
+ 60CO  G 58.603    7 100       M3+(E4)   0.02    LT    47.3     99.75     3     
+
+ 60CO    60CO IT DECAY                 1963SC14,1962HA46         13NDS    201312
+ 60CO  H TYP=FUL$AUT=E. BROWNE, J. K. TULI$CIT=NDS 114, 1849 (2013)$            
+ 60CO  P 58.603    7 2+                10.467 M  6                              
+ 60CO  N 0.0207    3 1.0       0.9975  3                                        
+ 60CO PN 0.0207    3 1.0                                                     3  
+ 60CO  L 0.0         5+                5.2712 Y  4                              
+ 60CO  L 58.603    7 2+                10.467 M  6                           M  
+ 60CO  G 58.603    7  100      M3+(E4)   0.02    LT    47.3     99.75     3     
+
+ 60NI    60CO B- DECAY (10.467 M)      1963SC14                  13NDS    201312
+ 60NI  H TYP=FUL$AUT=E. BROWNE, J. K. TULI$CIT=NDS 114, 1849 (2013)$            
+ 60CO  P 58.59     1 2+                10.467 M  6              2822.8    2     
+ 60NI  N 1.0                   0.0025  3 400                                    
+ 60NI PN                                                                     4  
+ 60NI  L 0.0         0+                STABLE                                   
+ 60NI  L 1332.508   42+                                                         
+ 60NI  B             0.24                   7.2                                 
+ 60NI  G 1332.492  4 100                                                        
+ 60NI  L 2158.613  222+                                                         
+ 60NI  B             0.0086                 7.4                                 
+ 60NI  G 826.10    3 3.1     AP                                                 
+ 60NI  G 2158.57   3 0.3     AP                                                 

@@ -1,0 +1,25 @@
+ 28P     28S B+ DECAY                  1989PO10                  13NDS    201310
+ 28P   H TYP=FUL$AUT=M. Shamsuzzoha Basunia$CIT=NDS 114, 1189 (2013)$           
+ 28P   H TYP=ERR$AUT=M.S. Basunia$DAT=1-Feb-2023$COM=Deleted                    
+ 28S   P 0.0         0+                125 MS    10             1.122E4   16    
+ 28P   N                       1.0       1.0                                    
+ 28P   L 0.0         3+                270.3 MS  5                              
+ 28P   L 5900      2 0+                                                         
+
+ 27SI    28S B+P DECAY                 1989PO10                  11NDS    201108
+ 27SI  H TYP=FUL$AUT=M. Shamsuzzoha Basunia$CIT=NDS 112, 1875 (2011)$           
+ 28S   P 0           0+                125 MS    10               917E1   16    
+ 27SI  N                        0.207  20               0.207 20                
+ 27SI  DP 1215     25  6.8   10                                                 
+ 27SI  DP 1456     25 10.1   17                                                 
+ 27SI  DP 1634     30  8.1   10                                                 
+ 27SI  DP 1824     30  6.4   10                                                 
+ 27SI  DP 2117     30  5.1   10                                                 
+ 27SI  DP 2536     25  7.4   10                                                 
+ 27SI  DP 3442     30  4.4    7                                                 
+ 27SI  L 0.0         5/2+                                                       
+ 27SI  DP 3698     20  9.5   10  5900                                           
+ 27SI  L 780.9     2 1/2+                                                       
+ 27SI  DP 2984     20 33         5900                                           
+ 27SI  L 957.4     2 3/2+                                                       
+ 27SI  DP 2769     30  8.4   10  5900                                           

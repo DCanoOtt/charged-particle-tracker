@@ -1,0 +1,38 @@
+ 24NA    ADOPTED LEVELS, GAMMAS                                  22NDS    202211
+ 24NA  L 0.0          4+                14.956 H 3                          V   
+ 24NA  L 472.2071  14 1+               20.18 MS  10                          M  
+
+ 24NA    24NA IT DECAY (20.18 MS)                                22NDS    202211
+ 24NA  H TYP=FUL$AUT=M. Shamsuzzoha Basunia, Anagha Chakraborty$                
+ 24NA  P 472.2071  14 1+               20.18 MS  10                             
+ 24NA  N 1           1.0       0.9995  AP                                       
+ 24NA PN                                                                     3  
+ 24NA  L 0            4+                14.956 H 3                              
+ 24NA  L 472.2071  14 1+               20.18 MS  10                          M  
+ 24NA  G 472.2023  14 99.95     [M3]                   4.69E-4   100            
+
+ 24MG    24NA B- DECAY (14.956 H)                                22NDS    202211
+ 24MG  H TYP=FUL$AUT=M. Shamsuzzoha Basunia, Anagha Chakraborty$                
+ 24NA  P 0            4+                14.956 H 3              5515.677  21    
+ 24MG  N  1.0         1.0      1.0       1.0                                    
+ 24MG PN                                                                     4  
+ 24MG  L 0            0+               STABLE                                   
+ 24MG  L 1368.667   5 2+                                                        
+ 24MG  G   1368.625 5 99.994 2   E2                     1.3E-5  3               
+ 24MG  L 4122.844  12 4+                                                        
+ 24MG  B              99.867 10           6.12    1                             
+ 24MG  G   2754.00811 99.867 10 E2                                              
+ 24MG  L 4238.38   13 2+                                                        
+ 24MG  G    2871.0 10 0.00025 4 M1+E2    -23     9                          A   
+ 24MG  G    4238.9 10 0.0008410 [E2]                                        A   
+ 24MG  L 5235.21    8 3+                                                        
+ 24MG  B              0.070  AP            6.66  AP                             
+ 24MG  G     996.8310 0.0021  2                                                 
+ 24MG  G   3866.15 10 0.068   6 E2(+M1)  -17     4                              
+
+ 24MG    24NA B- DECAY (20.18 MS)      1956DR11,1980HE08         22NDS    202211
+ 24MG  H TYP=FUL$AUT=M. Shamsuzzoha Basunia, Anagha Chakraborty$                
+ 24NA  P 472.2071  14 1+               20.18 MS  10             5515.677  21    
+ 24MG  N                       0.0005  AP2000                                   
+ 24MG  L 0            0+               STABLE                                   
+ 24MG  B              0.05   AP             5.8  AP                             

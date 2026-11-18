@@ -1,0 +1,815 @@
+ 22NE    ADOPTED LEVELS, GAMMAS                                  15NDS    201507
+ 22NE  H TYP=ERR$AUT=M.S. Basunia$DAT=22-Dec-2021$COM=Revised DSID 22NA B+ DECAY
+ 22NE2 H to 22NA EC DECAY in XREF                                               
+ 22NE  H TYP=ERR$AUT=M.S. Basunia$DAT=15-Nov-2019$COM=Corrected the Q|b- value  
+ 22NE2 H to 2843.20 keV {I17}.                                                  
+ 22NE  H TYP=MOD$AUT=M.S. Basunia$DAT=17-Oct-2017$COM=Removed spin-parity       
+ 22NE2 H assignments quoted from 18O(A,N): RES based on e-mail msg received from
+ 22NE3 H 1st author of 2013Be12 (A,N) (Dated: Oct. 17, 2017).                   
+ 22NE  H TYP=FUL$AUT=M. Shamsuzzoha Basunia$CIT=NDS 127, 69(2015)$              
+ 22NE2 H CUT=1-Apr-2015$                                                        
+ 22NE  Q -2843.20  1710364.26 4 15266.118-9666.81 2    2012WA38                 
+ 22NE c                                                                         
+ 22NE c  2006As01: No evidence of excited state population in {+22}Ne from      
+ 22NE2c  {+9}Be({+18}O,|a{+14}C), ({+18}O,{+10}Be{+12}C), and                   
+ 22NE3c  ({+18}O,{+9}Be{+13}C) reactions.                                       
+ 22NE c                                                                         
+ 22NE c  Other reaction: {+22}Ne(|a,|a'): 1971Ol01,1984Sa28,1987Su09            
+ 22NE cL E$From {+19}F(|a,p|g), except otherwise noted.                         
+ 22NE cL E(D)$From {+22}F |b{+-} decay                                          
+ 22NE cL E(F),T(M)$From (|g,|g')                                                
+ 22NE cL E(G)$From (t,p)                                                        
+ 22NE cL E(H)$Average of data from (t,p) and ({+6}Li,d). Uncertainty - lowest   
+ 22NE2cL experimental value.                                                    
+ 22NE cL E(I),T(N)$From (|a,|g)                                                 
+ 22NE cL E(J)$Weighted average of data from (|a,|g) and (|a,n). Uncertainty -   
+ 22NE2cL lowest experimental value.                                             
+ 22NE cL E(Q),J(Q)$Identified as member of a rotational band based on 0+ g.s. in
+ 22NE2cL 1976Fi02 (|a,p|g).                                                     
+ 22NE cL J(A),T(A,E)$From {+18}O({+4}He,{+4}He'):res. J|p assignments are based 
+ 22NE2cL on double differential cross section measurements and fitting.         
+ 22NE cL J(B)$From ({+12}C,|a). J|p assignments are based on the analysis of    
+ 22NE2cL double (|a,|a) angular correlations with the residual {+18}O nucleus   
+ 22NE3cL in the 0+ ground state.                                                
+ 22NE cL J(K)$Natural/Unnatural parity quoted in comment column from            
+ 22NE2cL 1971Ol01 - |s(180|') (|a,|a').                                         
+ 22NE cL T$|G{-0} values from (|a,n):res, except otherwise noted                
+ 22NE cL T(C)$From ({+12}C,|a)                                                  
+ 22NE cL T(L)$From 1993Ol05 (|a,p|g)                                            
+ 22NE cL T(O)$From ({+4}He,{+4}He'):Re                                          
+ 22NE cL T(P)$From (e,e')                                                       
+ 22NE c                                                                         
+ 22NE cG E$From level energy difference, recoil energy subtracted, except       
+ 22NE2cG otherwise noted.                                                       
+ 22NE cG E(X),RI(W)$From {+22}F |b{+-} decay, except otherwise noted.           
+ 22NE cG E(Z)$Placement from ({+26}Mg,{+22}Ne|g)                                
+ 22NE cG RI,M,MR$From 1993Ol05 (|a,p|g), except otherwise noted                 
+ 22NE cG RI(Y)$From (|a,|g)                                                     
+ 22NE cG RI(U)$From (t,p|g)                                                     
+ 22NE cG MR$From (|a,p|g), except otherwise noted.                              
+ 22NE c                                                                         
+ 22NE  XA22F B- DECAY                                                           
+ 22NE  XB22NA EC DECAY                                                          
+ 22NE  XJ4HE(19F,PG)                                                            
+ 22NE  XT11B(13C,D)                                                             
+ 22NE  XX12C(18O,8BE),14C(18O,10BE)                                             
+ 22NE  XY14C(12C,A)                                                             
+ 22NE  XD18O(A,G)                                                               
+ 22NE  XE18O(A,N): RES                                                          
+ 22NE  XZ18O(4HE,4HE'): RES                                                     
+ 22NE  XO18O(6LI,D)                                                             
+ 22NE  XP18O(7LI,T),(7LI,TG)                                                    
+ 22NE  XG19F(A,PG)                                                              
+ 22NE  XF20NE(T,P)                                                              
+ 22NE  XS20NE(T,PG)                                                             
+ 22NE  XN21NE(N,G) E=THERMAL                                                    
+ 22NE  XQ21NE(N,G): RES                                                         
+ 22NE  XK21NE(D,P)                                                              
+ 22NE  XI22NE(G,G')                                                             
+ 22NE  XH22NE(E,E')                                                             
+ 22NE  XM22NE(P,P')                                                             
+ 22NE  XRCOULOMB EXCITATION                                                     
+ 22NE  XU23NA(D,3HE)                                                            
+ 22NE  XL23NA(T,A)                                                              
+ 22NE  XV26MG(D,6LI)                                                            
+ 22NE  XW26MG(3HE,7BE)                                                          
+ 22NE  XC150ND(26MG,22NEG)                                                      
+ 22NE PN                                                                     6  
+ 22NE  L 0.0         0+                 STABLE                              K   
+ 22NEX L XREF=ABDEFGHIJKLMNOPQRSTUVW                                            
+ 22NE cL $|d<r{+2}>({+20}Ne,{+22}Ne)=-0.321 fm{+2} {i4} (stat) {i43} (syst)     
+ 22NE2cL (2011Ma48,2008Ge07). Absolute {+22}Ne charge radius=2.952 fm {i9}      
+ 22NE3cL (2008Ge07) deduced with respect to known {+20}Ne charge radius=3.006 fm
+ 22NE4cL {i5}.                                                                  
+ 22NE cL J$From optical spectroscopy (1927Ha01); L=0 in ({+6}Li,d), ({+7}Li,t), 
+ 22NE2cL and (t,p); natural parity.                                             
+ 22NE2 L FLAG=Q                                                                 
+ 22NE  L 1274.537  7 2+                3.60 PS   5                          K   
+ 22NE2 L MOMM1=+0.65 2 $ MOME2=-0.19 4                                          
+ 22NEX L XREF=ABCDFGHKLNOPQRSTUVW                                               
+ 22NE cL E$From |g-ray energy                                                   
+ 22NE cL J$E2 to 0+; L=2 in ({+6}Li,d), ({+7}Li,t), and (t,p); natural parity.  
+ 22NE cL MOMM1$Recoil into Vacuum, Differential method (1977Ho01, 2014StZZ)     
+ 22NE cL MOME2$Coulomb Excitation Reorientation (1981Sp07, 2014StZZ)            
+ 22NE cL T$From mean lifetime 5.19 ps {I7}: weighted average of mean lifetimes -
+ 22NE2cL 5.16 ps {I13} (1984Bh03), 5.1 ps {I2} (1983Ko01), 4.6 ps {I6}          
+ 22NE3cL (1979Ma13), 5.15 ps {I31} (1979Fo02), 5.2 ps {I3} (1977Ho01), 5.62 ps  
+ 22NE4cL {I20} (1977Ra01), 4.9 ps {I7} (1977Og03), 5.15 ps {I14} (1977Sc36),    
+ 22NE5cL 4.9 ps {I4} (1974Ol01), 5.4 ps {I4} (1973An01), 5.5 ps {I10}           
+ 22NE6cL (1973Si31), 5.9 ps {I11} (1972Sn01), 5.9 ps {I6} (1972Sz05), 3.6 ps    
+ 22NE7cL {I7} (1970Na07), 4.6 ps {I5} (1969Jo10), 6.1 ps {I5} (1969ScZV), and   
+ 22NExcL 3.1 ps {I11} (1960An07).                                               
+ 22NE2 L FLAG=Q                                                                 
+ 22NE  G 1274.537  7 100       E2                                               
+ 22NE2 G FL=0.0                                                                 
+ 22NE cG E,M$From {+22}Na |b{++} decay                                          
+ 22NEB G BE2W=12.76 18                                                          
+ 22NE  L 3357.2    5 4+                225 FS    4                          D   
+ 22NEX L XREF=ACDFGHKLOPSTUVW                                                   
+ 22NE2 L MOMM1=+2.2 6                                                           
+ 22NE2 L FLAG=KQ                                                                
+ 22NE cL J$L=4 in ({+6}Li,d); natural parity.                                   
+ 22NE cL MOMM1$Tilted Foil hyperfine field integral perturbed angular           
+ 22NE2cL correlation (1984Ba10, 2014StZZ)                                       
+ 22NE cL T$From mean lifetime 324 fs {I6}: weighted average of mean lifetimes - 
+ 22NE2cL 324 fs {I9} (1979Fo02), 311 fs {I17} (1978Fi04), 328 fs {I10}          
+ 22NE3cL (1978Ek01), 285 fs {I50} (1974Fi16), 360 fs {I50} (1972Br17 - average  
+ 22NE4cL of measurements with 39 different slowing down materials), 270 fs      
+ 22NE4cL {I90} (1968Ku05), 400 fs {I110} (1967Wa13), and 390 fs {I80}           
+ 22NExcL (1964Es02).                                                            
+ 22NE  G 2082.6    5 100       E2                                           X   
+ 22NEB G BE2W=17.5 4                                                            
+ 22NE  L 4456.2    9 2+                3.7 FS    25                         K   
+ 22NEX L XREF=ACDFGHJKLOPSTUVW                                                  
+ 22NE cL J$E2 to 0+;  L=2 in ({+6}Li,d), ({+7}Li,t), and L=(2) in (t,p);        
+ 22NE2cL natural parity.                                                        
+ 22NE2 L FLAG=L                                                                 
+ 22NE cL T$From (e,e') - 1979Ma13. Other values: <11 fs                         
+ 22NE2cL (1979Al01-({+19}F,p|g)), <30 (|a,p|g)), while 37 fs {I6} (1993Ol05 -   
+ 22NE3cL (|a,p|g)) is higher compared to other values.                          
+ 22NE  G 1099                                                               Z   
+ 22NE  G 3181.4        100.0 21M1+E2     +0.09   2                              
+ 22NE cG MR$Average of +0.11 {I3} (1994Br11 - also possibility of a large       
+ 22NE2cG value), +0.08 {I2} (1967Bu01).                                         
+ 22NEB G BM1W=0.18 12$BE2W=1.0 8                                                
+ 22NE  G 4455.7         3.1  21E2                                               
+ 22NEB G BE2W=0.7 5                                                             
+ 22NE  L 5146.0    9 2-                0.8 PS    2                          K   
+ 22NEX L XREF=DFGJKLPSTUV                                                       
+ 22NE cL J$E1 to 2+, L=1,3 in (t,p); unnatural parity                           
+ 22NE cL T$From mean lifetime 1.1 ps {I2}: weighted average of mean lifetimes - 
+ 22NE2cL 1.2 ps {I3} (1975Me19), 1.15 ps {I45} (1976Fi02), 1.3 ps {I5}          
+ 22NE3cL (1979Al01), and 0.9 ps {I4} (1993Ol05).                                
+ 22NE  G 689.8             89 6 E1+M2    -0.29   2                          U   
+ 22NE cG MR$Other value: +0.04 {i8} (1967Bu01)                                  
+ 22NEB G BE1W=0.0014 4$BM2W=1.2E+3 4                                            
+ 22NE  G 3871.1           100 6 E1+M2    +0.96   18                         U   
+ 22NE cG MR$Other value: +0.10 {i10} 1972Ho52                                   
+ 22NEB G BE1W=5.1E-6 17$BM2W=1.4 5                                              
+ 22NE  L 5329.6    131+                1.2 FS    3                          K   
+ 22NEX L XREF=DGHIKLST                                                          
+ 22NE cL E$Weighted average of data from (e,e'), (|g,|g'), and (|a,p|g)         
+ 22NE cL J$M1+E2 to 2+, J|p=1+ in (e,e') (1974Ma43); (unnatural                 
+ 22NE2cL parity)                                                                
+ 22NE cL T$From mean lifetime 1.7 ps {I3}: Weighted average of 1.7 fs {I3}      
+ 22NE2cL (e,e') (1979Ma13) and 1.8 fs {I7} (|g,|g') (1984Be26).                 
+ 22NE  G 4054.6          50  12 M1+E2    +1.9    5                              
+ 22NE cG MR$Weighted average of -1.7 {i10} (1972Ho52) and -2.0 {i6} (1993Ol05). 
+ 22NEB G BM1W=0.020 11$BE2W=31 12                                               
+ 22NE  G 5328.9         100  12 [M1]                                            
+ 22NEB G BM1W=0.081 25                                                          
+ 22NE  L 5363.4    112+                69 FS     12                         K   
+ 22NEX L XREF=FGKLOPSTV                                                         
+ 22NE cL J$E2 to 0+; L=2 in (t,p); natural parity                               
+ 22NE cL T$<20 fs in 1976Fi02 - reason for this discrepancy is unknown.         
+ 22NE2 L FLAG=L                                                                 
+ 22NE  G 4088.4         100   4 M1+E2    -0.19   4                              
+ 22NE cG MR$Weighted average of -0.12 {i6} (1993Ol05), -0.25 {i8} (1968Ku05),   
+ 22NE2cG and -0.27 {i8} (1976Fi02).                                             
+ 22NEB G BM1W=0.0039 8$BE2W=0.06 3                                              
+ 22NE  G 5362.7         16    4 [E2]                                            
+ 22NEB G BE2W=0.070 22                                                          
+ 22NE  L 5523.3    6 (4)+              21 FS     3                          D   
+ 22NEX L XREF=ACFGJKLOPSTV                                                      
+ 22NE2 L FLAG=K                                                                 
+ 22NE cL J$L=4 in ({+6}Li,d), (t,p); natural parity; J=3 in {+11}B({+13}C,d)    
+ 22NE cL T$From mean lifetime 30 fs {I4}: Weighted average of 27 fs {I4}        
+ 22NE2cL (1979Al01) and 37 fs {I6} (1993Ol05). Uncertainty - lower experimental 
+ 22NExcL value.                                                                 
+ 22NE  G 2166.1    5    100.0 6 M1                                          X   
+ 22NE2 G FLAG=W                                                                 
+ 22NE cG MR$-0.04 {i3} (1993Ol05) and -0.07 {i12} (1968Ku05) both in (|a,p|g))  
+ 22NEB G BM1W=0.102 15                                                          
+ 22NE  G 4247.9    10     1.6 3 E2                                          X   
+ 22NE2 G FLAG=W                                                                 
+ 22NEB G BE2W=0.084 20                                                          
+ 22NE  L 5641.2    7 3+                3 FS      LT                         D   
+ 22NEX L XREF=AFGJKLPSTV                                                        
+ 22NE2 L FLAG=KL                                                                
+ 22NE cL J$M1 to 2+; L=2 in (d,p); unnatural parity                             
+ 22NE  G 2283.9    7       45 3 M1(+E2)  -0.12   17                         X   
+ 22NE2 G FLAG=W                                                                 
+ 22NE cG RI$Other value: 30 {i4} in (t,p|g)                                     
+ 22NE cG MR$From 1968Ku05 (|a,p|g).                                             
+ 22NEB G BM1W>0.18                                                              
+ 22NE  G 4366.1    10     100 3 M1+E2    +0.15   2                          X   
+ 22NE2 G FLAG=W                                                                 
+ 22NE cG MR$Weighted average of +0.18 {i3} (1968Ku05), +0.19 {i4} (1967Bu01),   
+ 22NE2cG +0.13 {i3} (1972Ho52), and +0.16 {i3} (1976Br06).                      
+ 22NEB G BM1W>0.059$BE2W>0.36                                                   
+ 22NE  L 5910.1    9  3-               32 FS     11                         K   
+ 22NEX L XREF=AFGHLOPSTV                                                        
+ 22NE cL E$From (n,|g)                                                          
+ 22NE cL J$E1 to 2+; L=3 in ({+6}Li,d); natural parity; |g to 4+                
+ 22NE cL T$From mean lifetime 46 fs {I16}: Weighted average of 51 fs {I23}      
+ 22NE2cL (1976Fi02) and 44 fs {I16} (1993Ol05). Uncertainty - lower             
+ 22NExcL experimental value.                                                    
+ 22NE  G 1453.8            21 6 E1(+M2)  +0.19   10                             
+ 22NEB G BE1W=(0.0013 6)$BM2W=(1.0E+2 5)                                        
+ 22NE  G 2552.7            21 6                                                 
+ 22NE  G 4635.0           100 6 E1+M2    +0.17   6                              
+ 22NE cG MR$Other value: 0.02 {i2} (1976Br06)                                   
+ 22NEB G BE1W=0.00019 7$BM2W=1.1 9                                              
+ 22NE  L 6119.9    16 2+               14 FS     7                          K   
+ 22NEX L XREF=FGHKLOPSTV                                                        
+ 22NE cL J$L=2 in (t,p); natural parity.                                        
+ 22NE cL T$From (e,e'). Other value: 24 fs {I9} (1993Ol05)                      
+ 22NE  G 1663.6        10.3  13 M1+E2    +1.1    3                          U   
+ 22NEB G BM1W=0.012 8$BE2W=38 22                                                
+ 22NE  G 4844.8           100 4 M1+E2    +2.3    3                          U   
+ 22NE cG MR$also an alternate value: -0.11 {i4} (1993Ol05)                      
+ 22NEB G BM1W=0.0017 10$BE2W=2.7 14                                             
+ 22NE  G 6119.0            18 3  E2                                         U   
+ 22NE cG M$From (e,e') based on B(E2)                                           
+ 22NEB G BE2W=0.18 10                                                           
+ 22NE  L 6235      2 0+                236 FS    83                         K   
+ 22NEX L XREF=FGHOPV                                                            
+ 22NE cL J$L=0 in ({+6}Li,d), ({+7}Li,t), and (t,p); natural parity             
+ 22NE2 L FLAG=L                                                                 
+ 22NE  G 905            100                                                     
+ 22NE  L 6311.0    10 (6+)             49 FS     4                          Q   
+ 22NEX L XREF=CDGJLT                                                            
+ 22NE cL T$From mean lifetime 70 fs {I6}: Weighted average of 78 fs {I15}       
+ 22NE2cL (1976Fi02), 70 fs {I10} (1979Al01), and 69 fs {I6} (1993Ol05).         
+ 22NE3cL Uncertainty - lowest experimental value.                               
+ 22NE  G 2953.6         100    [E2]                                             
+ 22NEB G BE2W=14.0 12                                                           
+ 22NE  L 6345.1    104+                13 FS     3                          D   
+ 22NEX L XREF=ADFGJKLPSTV                                                       
+ 22NE2 L FLAG=KL                                                                
+ 22NE cL J$L=4 in (t,p), natural parity                                         
+ 22NE  G 2987.7    9 100       M1+E2     +0.68   16                         X   
+ 22NEB G BM1W=0.043 12$BE2W=16 7                                                
+ 22NE  L 6635.8    8  (3,4)+           49 FS     21                         L   
+ 22NEX L XREF=FGJKLTV                                                           
+ 22NE cL J$M1+E2 to 4+, |g to 2+, L=2 in (d,p).                                 
+ 22NE  G 3278.3            89 6 M1+E2    -0.9    3                              
+ 22NEB G BM1W=0.0033 18$BE2W=1.8 10                                             
+ 22NE  G 5360.6           100 6                                                 
+ 22NE  L 6689.0    11 1-               243 FS    132                        K   
+ 22NEX L XREF=FGHLPV                                                            
+ 22NE cL J$L=1 in (t,p); natural parity                                         
+ 22NE2 L FLAG=L                                                                 
+ 22NE  G 5413.7            45 9 [E1]                                            
+ 22NEB G BE1W=7.E-6 4                                                           
+ 22NE  G 6687.9           100 9 (E1)                                            
+ 22NEB G BE1W=8.E-6 5                                                           
+ 22NE  L 6819.4    16 2+                3 FS     LT                         L   
+ 22NEX L XREF=FGHJKLPTV                                                         
+ 22NE cL J$L=2 in (t,p), ({+7}Li,t); natural parity                             
+ 22NE  G 1455.9           43 16                                                 
+ 22NE  G 1673.3           57 16                                                 
+ 22NE  G 2363.1          100 16 M1+E2    +2.5    4                              
+ 22NEB G BM1W>0.021$BE2W>2.1E+2                                                 
+ 22NE  G 5544.1           70 16 M1                                              
+ 22NE cG MR$+0.10 {I10} 1993Ol05 (|a,p|g)                                       
+ 22NEB G BM1W>0.011                                                             
+ 22NE  L 6853.5    16 (1+)             0.38 FS   16                         M   
+ 22NEX L XREF=DFGHIKLMT                                                         
+ 22NE cL J$M1 to 0+ and 2+, also from |s(|q) and DWIA calculation in (p,p').    
+ 22NE  G 5578.2          85  8  M1+E2    +1.3    5                              
+ 22NEB G BM1W=0.06 4$BE2W=22 12                                                 
+ 22NE  G 6852.3         100  8  M1                                              
+ 22NEB G BM1W=0.10 5                                                            
+ 22NE  L 6900      2  0+               76 FS     8                          L   
+ 22NEX L XREF=FGHLP                                                             
+ 22NE cL J$L=0 in ({+7}Li,t)                                                    
+ 22NE  G 5624.7       100         E2                                            
+ 22NEB G BE2W=0.36 4                                                            
+ 22NE  L 7051      3 1-                100 FS    30                         K   
+ 22NEX L XREF=FGHKLPST                                                          
+ 22NE cL J$L=1 in (t,p); natural parity                                         
+ 22NE2 L FLAG=L                                                                 
+ 22NE  G 5776         100.0  11  [E1]                                       U   
+ 22NEB G BE1W=4.1E-5 13                                                         
+ 22NE  G 7050           9.9  11  [E1]                                       U   
+ 22NEB G BE1W=2.2E-6 7                                                          
+ 22NE  L 7341.1    11 0+               3 FS      LT                         K   
+ 22NEX L XREF=CGKLOPSTV                                                         
+ 22NE cL J$L=0 in ({+7}Li,t), ({+6}Li,d) for doublet; natural parity for        
+ 22NE2cL doublet. |g-rays to 1+ and 2+                                          
+ 22NE2 L FLAG=L                                                                 
+ 22NE  G 2011.4         100  8 (M1)                                             
+ 22NEB G BM1W>0.51                                                              
+ 22NE  G 2884.7          75  8 (E2)                                             
+ 22NEB G BE2W>1.1E+2                                                            
+ 22NE  L 7341.2    11(4)+              35 FS     21                         D   
+ 22NEX L XREF=AFGT                                                              
+ 22NE2 L FLAG=KL                                                                
+ 22NE cL J$L=(4) in (t,p); natural parity.                                      
+ 22NE  G 1430.9          100 6                                                  
+ 22NE cG E$|g-ray not seen in {+22}F |b{+-} decay. I{-|g} from (|a,p|g)         
+ 22NE  G 3983.5    10     96 6  M1+E2    -0.7    3                          X   
+ 22NEB G BM1W=0.0033 22$BE2W=0.7 6                                              
+ 22NE  L 7405.9    7  (3)-             32 FS     10                         K   
+ 22NEX L XREF=FGKLPTV                                                           
+ 22NE cL J$L=1 in (d,p), E1 to 2+ (|a,p|g), |g-ray feeding from 4+ state at     
+ 22NE2cL 8855; natural parity for doublet. Another possibility 1-, as suggested 
+ 22NE3cL in 1993Ol05 - (|a,p|g), less likely considering |g feeding from 4+.    
+ 22NE2 L FLAG=L                                                                 
+ 22NE  G 2259.8           100 3 M1+E2    +1.3    4                              
+ 22NEB G BM1W=0.014 7$BE2W=33 13                                                
+ 22NE  G 6130.4            56 3  E1                                             
+ 22NEB G BE1W=4.2E-5 14                                                         
+ 22NE  L 7423.0    9 (5+)              3 FS      LT                         D   
+ 22NEX L XREF=ACFGLT                                                            
+ 22NE2 L FLAG=L                                                                 
+ 22NE cL J$From (|a,p|g) (1993Ol05), based on |g(|q) and Hauser-Feshbach        
+ 22NE2cL calculations.                                                          
+ 22NE  G 1900.0    6  100                                                   X   
+ 22NE  L 7469      2  1,2              55 FS     21                         L  ?
+ 22NEX L XREF=GHKL                                                              
+ 22NE cL J$From (|a,p|g). 1559|g to 3-.                                         
+ 22NE  G 1559         100                                                       
+ 22NE  L 7489      5 1-                                                     K   
+ 22NEX L XREF=DFGLPS                                                            
+ 22NE cL J$L=1 in ({+7}Li,t) and (t,p); natural parity.                         
+ 22NE  G 1369              10 6                                                 
+ 22NE  G 2125              10 6                                                 
+ 22NE  G 6213              23 6                                                 
+ 22NE  G 7487             100 6 E1                                              
+ 22NE  L 7643.1    132+                470 AS    200                        P   
+ 22NEX L XREF=FGHKOPTV                                                          
+ 22NE cL J$L=2 in ({+7}Li,t); 7641|g E2 to 0+                                   
+ 22NE  G 3186.7            42 5                                                 
+ 22NE  G 6367.6           100 5 M1+E2    -0.08   5                              
+ 22NE cG MR$From 1976Fi02                                                       
+ 22NE  G 7641.7            12 5 E2                                              
+ 22NE  L 7663.7    9  (2)-                                                      
+ 22NEX L XREF=FGH(7630)K                                                        
+ 22NE cL J$L=1 in (d,p); also from (e,e')                                       
+ 22NE  G    1428.7      100                                                     
+ 22NE  L 7722.0    113-                                                     K   
+ 22NEX L XREF=FGKOPTV                                                           
+ 22NE cL J$L=3 ({+6}Li,d), ({+7}Li,t), and (t,p); natural parity.               
+ 22NE  G 1602.0            1916                                                 
+ 22NE  G 2198.6            2516                                                 
+ 22NE  G 2575.8            2216                                                 
+ 22NE  G 3265.5           10016                                                 
+ 22NE  G 4364.3            7816                                                 
+ 22NE  G 6446.5            6916                                                 
+ 22NE  L 7921      2  (2)+                                                  K   
+ 22NEX L XREF=FGHKPTV                                                           
+ 22NE cL J$L=2 in (t,p); natural parity. J=3 in ({+13}C,d).                     
+ 22NE  G 580         20      15                                                 
+ 22NEF G FL=7341.2                                                              
+ 22NE  G 1102        29      15                                                 
+ 22NE  G 2398        33      15                                                 
+ 22NE  G 6645        100     15                                                 
+ 22NE  L 8076.9    14  (4)+                                                     
+ 22NEX L XREF=FGKPT                                                             
+ 22NE cL J$L=2 in (d,p); J=3 in ({+13}C,d); |g-ray transitions to 2+, 4+,(6+)   
+ 22NE  G    1765.8        50 22                                                 
+ 22NE  G    2713.3        36 22                                                 
+ 22NE  G    4719.1        10022                                                 
+ 22NE  G    6801.2        92 22                                                 
+ 22NE  L 8134.3    4 2+                                                     K   
+ 22NEX L XREF=FGKOPTV                                                           
+ 22NE cL J$L=2 in (t,p); natural parity.                                        
+ 22NE  G    1314.9         8 3                                                  
+ 22NE  G  6858.6         100 3  M1+E2    -0.48   5                              
+ 22NE cG RI$From 1976Fi02 (|a,p|g)                                              
+ 22NE  L 8162.2    13 2+,3,4+                                                   
+ 22NEX L XREF=FGH                                                               
+ 22NE cL J$|g's to 2+ and 4+                                                    
+ 22NE  G    1342.8         8  8                                                 
+ 22NE  G    4804.4        44  8                                                 
+ 22NE  G    6886.5      100   8                                                 
+ 22NE  L 8375.9    16 (3)-                                                      
+ 22NEX L XREF=FGKPTV                                                            
+ 22NE cL J$L=3 in (t,p); natural parity; |g transitions to 2+, 4+. But J=5 in   
+ 22NE2cL ({+13}C,d).                                                            
+ 22NE  G     712.2        8   7                                                 
+ 22NE  G    5018.1      100   7                                                 
+ 22NE  G    7100.1       28   7                                                 
+ 22NE  L 8452      7                                                            
+ 22NEX L XREF=V                                                                 
+ 22NE  L 8489.6    12  2+                                                       
+ 22NEX L XREF=F(8500)GKPT                                                       
+ 22NE cL J$L=2 in (t,p)                                                         
+ 22NE  G     412.7       32  32                                                 
+ 22NE  G    1148.4      100  32                                                 
+ 22NEF G FL=7341.2                                                              
+ 22NE  G    2254.5       82  32                                                 
+ 22NE  G    2848.2       71  32                                                 
+ 22NE  G    5131.8       71  32                                                 
+ 22NE  L 8561.4    19(1,2)+              0.35 FS 13                         F   
+ 22NEX L XREF=FGIK                                                              
+ 22NE cL J$L=2 in (d,p), |g to 0+ and 1-                                        
+ 22NE2 L FLAG=M                                                                 
+ 22NE  G 1872.3           72 12                                                 
+ 22NE  G 8559.6           10012                                                 
+ 22NE  L 8573      10                                                           
+ 22NEX L XREF=V                                                                 
+ 22NE  L 8596.0    9                                                            
+ 22NEX L XREF=FGHKPT                                                            
+ 22NE  G     519.1       100  6                                                 
+ 22NE  G    3449.7        20  6                                                 
+ 22NE  L 8741.0    14 (3)-                                                      
+ 22NEX L XREF=FGKTV                                                             
+ 22NE cL J$L=3 in (t,p); but J=5 in ({+13}C,d).                                 
+ 22NE  G    1399.6         1912                                                 
+ 22NEF G FL=7341.2                                                              
+ 22NE  G    1689.9         2812                                                 
+ 22NE  G    4284.3        10012                                                 
+ 22NE  G    5383.1         2812                                                 
+ 22NE  L 8855.3    15      (4)+                                                 
+ 22NEX L XREF=FGK                                                               
+ 22NE cL J$L=2 in (d,p); |g transitions to (3)-, (6)+                           
+ 22NE  G    1449.3        39 10                                                 
+ 22NE  G    2544.1       100 10                                                 
+ 22NE  L 8900.3    16                                                           
+ 22NEX L XREF=DGKMT                                                             
+ 22NE cL J$Reported as doublet of 1- and (4,5)+ in 1998En04.                    
+ 22NE  G    1477.2        54 33                                                 
+ 22NE  G    1559.0       100 33                                                 
+ 22NEF G FL=7341.2                                                              
+ 22NE  G    2211.2      71   33                                                 
+ 22NE  G    2589.1        79 33                                                 
+ 22NE  G    3258.8        54 33                                                 
+ 22NE  G    3536.6        58 33                                                 
+ 22NE  L 8976      3                                                            
+ 22NEX L XREF=FGOT                                                              
+ 22NE  G      1312        56 11                                                 
+ 22NE  G      1925       100 11                                                 
+ 22NE  L 9045      3  (2+,3-)                                                   
+ 22NEX L XREF=FGKV                                                              
+ 22NE cL J$|g's to 4+, 1-                                                       
+ 22NE  G 1402             71 24                                                 
+ 22NE  G 1994             92 24                                                 
+ 22NE  G 5687            100 24                                                 
+ 22NE  L 9097      3 (1 TO 3)-                                                  
+ 22NEX L XREF=FGKOT                                                             
+ 22NE cL J$L=1 in (d,p); possible |g-ray branch to 2+ (1976Fi02)                
+ 22NE  L 9178      3   1+              84 AS     3                          M   
+ 22NEX L XREF=IH(9140)                                                          
+ 22NE cL E$Other values: 9165 {i3} (1979Be10 - (|g,|g')), 9170 {i4} (1976Fi02   
+ 22NE2cL - (|a,p|g)), 9179 {i10} (1974Fl07 - (t,p))                             
+ 22NE cL J$From (pol |g,|g).                                                    
+ 22NE  G 9176         100                                                       
+ 22NE cG E$placement in (|g,|g)                                                 
+ 22NE  L 9178.1    7  (4)+                                                      
+ 22NEX L XREF=FGMOT                                                             
+ 22NE cL J$L=4 in (t,p); but J=5 in ({+13}C,d)                                  
+ 22NE  G    3267.6        64 11                                                 
+ 22NE  G    4721.3        25 11                                                 
+ 22NE  G    5819.9       100 11                                                 
+ 22NE  L 9229      3   2+                                                       
+ 22NEX L XREF=FGOV                                                              
+ 22NE cL J$L=2 in (t,p); |g transitions to 1-,2- states                         
+ 22NE  G  1565            79 9                                                  
+ 22NE  G  2178           100 9                                                  
+ 22NE  L 9250      3                                                            
+ 22NEX L XREF=G                                                                 
+ 22NE  G 1528            100 11                                                 
+ 22NE  G 3130             56 11                                                 
+ 22NE  L 9324      2                                                            
+ 22NEX L XREF=GT                                                                
+ 22NE  G 1602         100                                                       
+ 22NE  L 9508      10                                                       G   
+ 22NEX L XREF=FGOT                                                              
+ 22NE  L 9541      10   2+                                                      
+ 22NEX L XREF=F                                                                 
+ 22NE cL J$L=2 in (t,p)                                                         
+ 22NE  L  9625     12    5                                                      
+ 22NEX L XREF=G(9609)OT(9640)                                                   
+ 22NE cL E$Average of data from (|a,p|g), ({+6}Li,d), and ({+13}C,d)            
+ 22NE cL J$From (|a,p|g) (1976Br06).                                            
+ 22NE  G  3314            45                                                    
+ 22NE  G  6267           100                                                    
+ 22NE  L 9654      10                                                           
+ 22NEX L XREF=FT(9630)                                                          
+ 22NE  L 9725      10 (3-)                                                  H   
+ 22NEX L XREF=FG(9697)O                                                         
+ 22NE cL J$L=(3) in ({+7}Li,t)                                                  
+ 22NE  L 9841      10 (2+)                                                  G   
+ 22NEX L XREF=FGO                                                               
+ 22NE cL J$L=(2) in ({+7}Li,t)                                                  
+ 22NE  L 10066     10 (0+)                                                  H   
+ 22NEX L XREF=FO                                                                
+ 22NE cL J$L=(0) in ({+7}Li,t)                                                  
+ 22NE  L 10137     10   2+                                                  H   
+ 22NEX L XREF=FGO                                                               
+ 22NE cL J$L=2 in (t,p)                                                         
+ 22NE  L 10208.5   10  1-              2 KEV     LT                         I   
+ 22NEX L XREF=DFGIO                                                             
+ 22NE cL J$L=1 in ({+6}Li,d), |g to 0+                                          
+ 22NE2 L FLAG=N                                                                 
+ 22NE  G    8932.0         25 6                                             Y   
+ 22NE  G   10206.0        100 6 E1                                          Y   
+ 22NE  L 10280.4   10  (0+,1-,2+)      2 KEV     LT                         I   
+ 22NEX L XREF=DGO                                                               
+ 22NE cL J$From (|a,|g) angular distributions                                   
+ 22NE2 L FLAG=N                                                                 
+ 22NE  G    2791.2         23 7                                             Y   
+ 22NE  G    3426.6         45 9                                             Y   
+ 22NE  G    4950.2        10012                                             Y   
+ 22NE  G    5823.4          2 1                                             Y   
+ 22NE  G    9003.9         5712                                             Y   
+ 22NE  L 10294.8   10  (2+)             2 KEV    LT                         I   
+ 22NEX L XREF=DF                                                                
+ 22NE cL J$Suggested in 1994Gi01, 9018|g D to 2+                                
+ 22NE2 L FLAG=N                                                                 
+ 22NE  G    2805.6         19 5                                             Y   
+ 22NE  G    3441.0         16 5                                             Y   
+ 22NE  G    4964.6         30 7                                             Y   
+ 22NE  G    5837.8         11 4                                             Y   
+ 22NE  G    9018.3        10012 D                                           Y   
+ 22NEF G FL=1274.537                                                            
+ 22NE cG MR$0.04 {i5} in (|a,|g)                                                
+ 22NE  L 10384     15                                                           
+ 22NEX L XREF=FG(*)NO                                                           
+ 22NE cL E$From (t,p)                                                           
+ 22NE cL J$6,8 in (|a,p|g)                                                      
+ 22NE  L 10416.4   3                                                            
+ 22NEX L XREF=FG(*)OQ                                                           
+ 22NE cL E$From (n,|g): res                                                     
+ 22NE cL J$6,8 in (|a,p|g)                                                      
+ 22NE  G     4071                                                               
+ 22NE  L 10462.5   5   3-                                                       
+ 22NEX L XREF=FQ                                                                
+ 22NE cL E$From (n,|g): res                                                     
+ 22NE cL J$L=3 in (t,p)                                                         
+ 22NE  L 10501.6   3   2+                                                       
+ 22NEX L XREF=FQ                                                                
+ 22NE cL E$From (n,|g): res                                                     
+ 22NE cL J$L=2 in (t,p)                                                         
+ 22NE  L  10544.9  4   2+                                                       
+ 22NEX L XREF=FQ                                                                
+ 22NE cL E$From (n,|g): res                                                     
+ 22NE cL J$L=2 in (t,p)                                                         
+ 22NE  L 10616     3     (5-)           6 KEV                               J   
+ 22NEX L XREF=DEFGO                                                             
+ 22NE cL J$From |a|g angular distribution measurements (|a,|g).                 
+ 22NE  G     4270         100 8                                             Y   
+ 22NE  G     7258          52 8                                             Y   
+ 22NE  L 10696     4                    4 KEV    LT                         N   
+ 22NEX L XREF=DO                                                                
+ 22NE cL E$From (|a,|g)                                                         
+ 22NE  G 7337          100                                                      
+ 22NE  L 10706     6                    10 KEV   LT                         N   
+ 22NEX L XREF=DEF(10720)                                                        
+ 22NE cL E$From (|a,|g)                                                         
+ 22NE  G 9429          100                                                      
+ 22NE  L 10749     3   5-               6 KEV                                   
+ 22NEX L XREF=DEG                                                               
+ 22NE cL E$From (|a,n)                                                          
+ 22NE cL J$From (|a,|g). Natural parity listed in 1990En08 Table 22.11.         
+ 22NE  G 4437          100   10                                             Y   
+ 22NE  G 7390           92   10                                             Y   
+ 22NE  L 10857     3  3-                6 KEV                               J   
+ 22NEX L XREF=DEFO                                                              
+ 22NE cL J$L=3 in (t,p)                                                         
+ 22NE  G 9580          100                                                      
+ 22NE  L 10890     10   1+                                                      
+ 22NEX L XREF=M                                                                 
+ 22NE cL J$From |s(|q) and DWIA calculation in (p,p')                           
+ 22NE  L 10921     3    1-              24 KEV                              J   
+ 22NEX L XREF=DEF                                                               
+ 22NE cL J$L=1 in (t,p); |g transitions to 0+, 2+ states                        
+ 22NE  G 9644          100    9                                             Y   
+ 22NE  G 10918          79    9                                             Y   
+ 22NE  L 11032     6   (8+,6+)          10 KEV   LT                         I   
+ 22NEX L XREF=CDEGO                                                             
+ 22NE cL J$8+ in (|a,p|g), (8+,6+) in (|a,|g).                                  
+ 22NE2 L FLAG=N                                                                 
+ 22NE  G 4721                                                               ZC  
+ 22NE  L 11064     10  2+                                                       
+ 22NEX L XREF=F                                                                 
+ 22NE cL J$L=2 in (t,p)                                                         
+ 22NE  L 11130     5  6,7               5 KEV    LT                         I   
+ 22NEX L XREF=DGO                                                               
+ 22NE cL J$From (|a,p|g), angular correlation measurements                      
+ 22NE2 L FLAG=N                                                                 
+ 22NE  G 4818          100                                                      
+ 22NE  L 11172                                                                  
+ 22NEX L XREF=E                                                                 
+ 22NE  L 11194     3                    7 KEV                               J   
+ 22NEX L XREF=DEF                                                               
+ 22NE  G 2294          100    4                                             Y   
+ 22NE  G 9917           18    4                                             Y   
+ 22NE  L 11269     5   2+,3+,4+         12 KEV                              J   
+ 22NEX L XREF=DEFO                                                              
+ 22NE cL J$From 1978Tr05 (|a,|g) - based on |a|g angular distribution           
+ 22NE2cL measurements.                                                          
+ 22NE  G 6122          100   15                                             Y   
+ 22NE  G 7910           81   15                                             Y   
+ 22NE  L 11323                                                                  
+ 22NEX L XREF=E                                                                 
+ 22NE  L 11431     8                    48 KEV                              J   
+ 22NEX L XREF=DEF                                                               
+ 22NE cL J$Natural parity in 1978Tr05 (|a,|g).                                  
+ 22NE  G 10154         100                                                      
+ 22NE  L 11465     3    (1-)            3 KEV    LT                         J   
+ 22NEX L XREF=DE                                                                
+ 22NE cL J$From 1978Tr05,1970Ch18 (|a,|g).                                      
+ 22NE  G 6320          100    4                                             Y   
+ 22NE  G 10190          33    4                                             Y   
+ 22NE  G 11464          49    4                                             Y   
+ 22NE  L 11522     8  7-                                                        
+ 22NEX L XREF=DEFG                                                              
+ 22NE cL E$Weighted average of data 11533 {I10} (1994Ma37) and 11520 {I15}      
+ 22NE2cL (1974Fl07) in (t,p), and 11482 {I20} (|a,p|g).                         
+ 22NE cL J$From (|a,p|g), angular correlation measurements. Natural parity      
+ 22NE2cL listed in 1990En08 - Table 22.11.                                      
+ 22NE  G 5221          100                                                      
+ 22NE  L 11577     5                    18 KEV                                  
+ 22NEX L XREF=DEF                                                               
+ 22NE cL E$From (|a,n)                                                          
+ 22NE  L 11656     10                                                           
+ 22NEX L XREF=F                                                                 
+ 22NE  L 11686     5    (2+)            9 KEV                                   
+ 22NEX L XREF=DE                                                                
+ 22NE cL E,J$From (|a,|g)                                                       
+ 22NE  L 11708     15   (2+)            5 KEV                               A   
+ 22NEX L XREF=EFZ                                                               
+ 22NE cL E$From (t,p)                                                           
+ 22NE  L 11745                         41 KEV                                   
+ 22NEX L XREF=D                                                                 
+ 22NE  L 11751          1-              8 KEV                                   
+ 22NEX L XREF=D                                                                 
+ 22NE  L 11772     10   3-                                                  G   
+ 22NEX L XREF=FZ                                                                
+ 22NE cL J$L=3 in (t,p). Inconsistent with 1- in ({+4}He,{+4}He').              
+ 22NE  L 11892     6    1              10 KEV                               E   
+ 22NEX L XREF=DFHMZ                                                             
+ 22NE cL E$Weighted average of data from 11886 {i10} (|a,|g), 11907 {i10} and   
+ 22NE2cL 11895 {i15} (t,p), and 11880 {i10} ({+4}He,{+4}He').                   
+ 22NE cL J$1+ in (p,p'), 1- in ({+4}He,{+4}He') and (|a,|g).                    
+ 22NE  L 12000     10   1+                                                      
+ 22NEX L XREF=M                                                                 
+ 22NE  L 12020     10   0+             68 KEV                               A   
+ 22NEX L XREF=Z                                                                 
+ 22NE  L 12071     15                                                           
+ 22NEX L XREF=F                                                                 
+ 22NE  L 12218     15                                                           
+ 22NEX L XREF=F                                                                 
+ 22NE  L 12250     10 0+               76 KEV                               A   
+ 22NEX L XREF=Z                                                                 
+ 22NE  L 12280     10 1-               51 KEV                               A   
+ 22NEX L XREF=DZ                                                                
+ 22NE  L 12390     10  3-              99 KEV                               E   
+ 22NEX L XREF=FZ                                                                
+ 22NE cL J$L=3 in (t,p), Inconsistent with 2+ in ({+4}He,{+4}He').              
+ 22NE  L 12450     20  (0+,1-)                                                  
+ 22NEX L XREF=F                                                                 
+ 22NE cL J$L=0,1 in (t,p)                                                       
+ 22NE  L 12570     10   (1-)           105 KEV                              A   
+ 22NEX L XREF=HZ                                                                
+ 22NE  L 12610     10 (2+)             124 KEV                              A   
+ 22NEX L XREF=Z                                                                 
+ 22NE  L 12643     15                                                           
+ 22NEX L XREF=F                                                                 
+ 22NE  L 12700     10 3-               15 KEV                               A   
+ 22NEX L XREF=Z                                                                 
+ 22NE  L 12800     10 2+               50 KEV                               A   
+ 22NEX L XREF=Z                                                                 
+ 22NE  L 12820     10 1-               170 KEV                              A   
+ 22NEX L XREF=Z                                                                 
+ 22NE  L 12862     15  (3-)            145 KEV                              O   
+ 22NEX L XREF=FZ(12840)                                                         
+ 22NE cL J$L=(3) in (t,p). J|p=1- in ({+4}He,{+4}He'):res                       
+ 22NE  L 12900     10   3-             39 KEV                               A   
+ 22NEX L XREF=FZ                                                                
+ 22NE cL E$Average of data from (t,p) and ({+4}He,{+4}He')                      
+ 22NE  L 12990     10 0+               80 KEV                               A   
+ 22NEX L XREF=Z                                                                 
+ 22NE  L 13030     10 2+               90 KEV                               A   
+ 22NEX L XREF=Z                                                                 
+ 22NE  L 13078     20                                                           
+ 22NEX L XREF=F                                                                 
+ 22NE  L 13190     10    3-            79 KEV                               A   
+ 22NEX L XREF=Z                                                                 
+ 22NE  L 13210     10 0+               81 KEV                               A   
+ 22NEX L XREF=Z                                                                 
+ 22NE  L 13274     20                                                           
+ 22NEX L XREF=F                                                                 
+ 22NE  L 13392     8     3-            58 KEV                               A   
+ 22NEX L XREF=FZ                                                                
+ 22NE cL E$Average of data from (t,p) and ({+4}He,{+4}He')                      
+ 22NE  L 13460     10                                                           
+ 22NEX L XREF=M                                                                 
+ 22NE  L 13490     10  4+              29 KEV                               A   
+ 22NEX L XREF=Z                                                                 
+ 22NE  L 13540     10  0+              96 KEV                               A   
+ 22NEX L XREF=Z                                                                 
+ 22NE  L 13570     10  3-              136 KEV                              A   
+ 22NEX L XREF=Z                                                                 
+ 22NE  L 13650     10  (3-)            48 KEV                               A   
+ 22NEX L XREF=Z                                                                 
+ 22NE  L 13670     10  (2+)            41 KEV                               A   
+ 22NEX L XREF=Z                                                                 
+ 22NE  L 13690     10  (5-)            50 KEV                               A   
+ 22NEX L XREF=Z                                                                 
+ 22NE  L 13730     10  4+              57 KEV                               A   
+ 22NEX L XREF=Z                                                                 
+ 22NE  L 13820     10  (2+)            51 KEV                               A   
+ 22NEX L XREF=Z                                                                 
+ 22NE  L 13880     10   4+             46 KEV                               A   
+ 22NEX L XREF=M(13890)Z                                                         
+ 22NE  L 14060     20                                                           
+ 22NEX L XREF=M                                                                 
+ 22NE  L 14470                                                                  
+ 22NEX L XREF=X                                                                 
+ 22NE  L 15580     40                                                           
+ 22NEX L XREF=M                                                                 
+ 22NE  L 16510     10                                                           
+ 22NEX L XREF=M                                                                 
+ 22NE  L 17.00E3   10                                                           
+ 22NEX L XREF=Y                                                                 
+ 22NE  L 17.48E3   10                                                           
+ 22NEX L XREF=X                                                                 
+ 22NE  L 18.43E3   10                  330 KEV   AP                         C   
+ 22NEX L XREF=XY                                                                
+ 22NE cL E$Average of data from ({+18}O,{+8}Be),{+14}C({+18}O,{+10}Be) and      
+ 22NExcL ({+12}C,|a).                                                           
+ 22NE  L 19280     20  (7-)            88 KEV                               A   
+ 22NEX L XREF=Y(19130)Z                                                         
+ 22NE  L 19.45E3   10  (6+)                                                     
+ 22NEX L XREF=X                                                                 
+ 22NE cL J$Based on |a-|a angular distribution measurements (2006Yi01).         
+ 22NE  L 19560     20  (7-)            75 KEV                               A   
+ 22NEX L XREF=Z                                                                 
+ 22NE  L 19.89E3   10   (10+)                                                   
+ 22NEX L XREF=X                                                                 
+ 22NE cL J$Based on |a-|a angular distribution measurements (2006Yi01).         
+ 22NE  L 20.00E3   10 (9-)             270 KEV   AP                             
+ 22NEX L XREF=Y                                                                 
+ 22NE2 L FLAG=B                                                                 
+ 22NE  L 20.70E3   10 (11-)            340 KEV   AP                         A   
+ 22NEX L XREF=Y                                                                 
+ 22NE  L 20850     20  (9-)            110 KEV                              A   
+ 22NEX L XREF=Z                                                                 
+ 22NE  L 21840     20  (9-)            170 KEV                              A   
+ 22NEX L XREF=XY(21600)Z                                                        
+ 22NE cL E$From ({+4}He,{+4}He'):res                                            
+ 22NE cL $|G - Other value: |J 350 keV ({+12}C,|a)                              
+ 22NE  L 22.20E3   10  (12+)           250 KEV   AP                         C   
+ 22NEX L XREF=Y                                                                 
+ 22NE2 L FLAG=B                                                                 
+ 22NE  L 22.90E3   10                  290 KEV   AP                         C   
+ 22NEX L XREF=Y                                                                 
+ 22NE  L 24.14E3   20                                                           
+ 22NEX L XREF=Y(24000)Z                                                         
+ 22NE  L 25.00E3   10   (9-)           350 KEV   AP                         C   
+ 22NEX L XREF=Y                                                                 
+ 22NE2 L FLAG=B                                                                 
+ 22NE  L 25.90E3   10                                                           
+ 22NEX L XREF=Y                                                                 
+ 22NE  L 26.89E3   20                                                           
+ 22NEX L XREF=Y(27000)Z                                                         
+
+ 22NE    22NA EC DECAY                                           15NDS    201507
+ 22NE  H TYP=ERR$AUT=M.S. Basunia$DAT=22-Dec-2021$COM=Revised DSID 22NA B+ DECAY
+ 22NE2 H to 22NA EC DECAY.                                                      
+ 22NE  H TYP=ERR$AUT=M.S. Basunia$DAT=15-Nov-2019$COM=Corrected the             
+ 22NE2 H $Q|b- value to 2843.20 keV {i17} and associated data in the dataset.   
+ 22NE  H TYP=FUL$AUT=M. Shamsuzzoha Basunia$CIT=NDS 127, 69(2015)$              
+ 22NE2 H CUT=1-Apr-2015$                                                        
+ 22NE c  Decay scheme from the Table de Radionuclides - CEA ISBN 2 {I7272} 0200 
+ 22NE2c  {I8}, except as noted.  Produced by {+19}F(|a,n), {+24}Mg(d,|a).       
+ 22NE c  Others: 2009Si18,2008Li02,2008Ru01,2006Li34,1983Ba41,1976Ma38,         
+ 22NE2c  1968Le03.                                                              
+ 22NA  P 0.0         3+                2.6018 Y  22             2843.20   17    
+ 22NE  N 1.0                   1.0       1.0                                    
+ 22NE cN NR$From |SI(|g+ce) to (g.s.)=100                                       
+ 22NE PN                                                                     3  
+ 22NE tL $             KLL Auger electron data from 2007In06                    
+ 22NE tL $                                                                      
+ 22NE tL $The absolute energy of the KL{-2}L{-3}({+1}D) Auger transition is     
+ 22NE tL $824.5 eV {I19} relative to Fermi level. This energy is higher by about
+ 22NE tL $20 eV compared to that obtained in experiments with free Ne atoms.    
+ 22NE tL $                                                                      
+ 22NE tL $--------------------------------------------------------------------- 
+ 22NE tL $Transitions        Relative energies     Relative intensities         
+ 22NE tL $                           (in eV)              (KL{-i}L{-j}/|SKLL,%) 
+ 22NE tL $--------------------------------------------------------------------- 
+ 22NE tL $KL{-1}L{-1}({+1}S)        -56.0 {I2}                  6.2 {I4}        
+ 22NE tL $KL{-1}L{-2}({+1}P)        -32.7 {I1}                 16.8 {I7}        
+ 22NE tL $KL{-1}L{-3}({+3}P)        -21.9 {I2}                  6.8 {I5}        
+ 22NE tL $KL{-2}L{-2}({+1}S)         -4.3 {I5}                  8.5 {I10}       
+ 22NE tL $KL{-2}L{-3}({+1}D)          0                     61.7 {I17}          
+ 22NE tL $Unknown          +18.5 {I5}                  2.8 {I5}                 
+ 22NE tL $--------------------------------------------------------------------- 
+ 22NE tL $                                                                      
+ 22NE  L 0           0+                STABLE                                   
+ 22NE  E               0.055 14 0.0009825  14.92 11             0.056     14 2U 
+ 22NES E EAV=835.46$CK=0.016146 6$CL=0.0013378 5$CM+=1.8761E-5 7                
+ 22NE cE           1996Sa06 measured I|e=0.07 {I2}                              
+ 22NE  L 1274.53   7 2+                                                         
+ 22NE  E               89.90 9   10.04 9  7.41                  99.944    14    
+ 22NES E EAV=216.012 76$CK=0.0927 1$CL=0.007674 8$CM+=0.0001076 1               
+ 22NE cE $|e/|b+=0.1071 {I5}, weighted average of measured values:              
+ 22NE2cE 0.1084 {I27} (2009Na08), 0.1050 {I29} (1990Ku11), 0.1075 {I25}         
+ 22NE3cE (1986Sy01), 0.1079 {I3} (1983Ba41), 0.1128 {I57} (1977Bo10); 0.1077    
+ 22NE4cE {I6} (1976Ma38), 0.1042 {I10} (1968We02), 0.1048 {I7} (1967Le07),      
+ 22NE5cE 0.1041 {I10} (1964Wi04), 0.112 {I4} (1959Ra09), and 0.110 {I6}         
+ 22NE6cE (1954Sh31). Theoretical value |e/|b+=0.1152 {I3} (1978Fi11). Note      
+ 22NE7cE I|e/I|b+=0.1064 {I2}, I|e and I|b+ obtainted using the Log {Ift} code  
+ 22NE8cE available at NNDC, BNL website.                                        
+ 22NE  G 1274.537  7 99.940  14 E2                     2.8E-05 3                
+ 22NE cG E$From 2000He14                                                        
+ 22NE cG CC$|a(tot)=6.8|*10{+-4}, from experimental value of 1985HaZA.          
+ 22NE2cG Interpolated value is 6.8|*10{+-6} from tables of 1976Ba63. Internal   
+ 22NE3cG pair formation coefficient |a{-|p}=2.1|*10{+-5} {I3} (1979Sc31).       
+ 22NExcG |a=|a(tot)+|a{-|p}.                                                    

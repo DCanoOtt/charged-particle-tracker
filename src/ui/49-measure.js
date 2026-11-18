@@ -46,6 +46,9 @@ const MEAS_DEF = {
   thPile: true,
   thBkg: true,
   ylog: 'lin',
+  byl: 'log',
+  bxl: 'lin',
+  syl: 'log',
   sel: {}
 };
 let MEAS = { res: null, hidden: {}, z: {}, sol0: null, list: [], busy: false };
@@ -338,6 +341,8 @@ async function measRun() {
     const { eff, ppd } = measEffInfo(g),
       bk = measBkg(m, g),
       tau = Math.max(0, +g.tau || 0) * 1e-6,
+      tauD = Math.max(0, +g.tauD || 0) * 1e-6,
+      LF = new Float64Array(N),
       pps = {};
     for (const li of keys) {
       const so = sols[li];
@@ -411,15 +416,17 @@ async function measRun() {
       const R = pulses / live + bk.total,
         mu = R * tau,
         puLoss = 1 - Math.exp(-2 * mu),
-        puF = m.pile ? 1 - puLoss : 1,
-        puFth = m.pile && m.thPile ? 1 - puLoss : 1;
+        fD = tauD > 0 ? 1 / (1 + R * tauD) : 1, // non-paralysable DAQ dead time: fraction of the pulses recorded
+        lossF = (m.pile ? 1 - puLoss : 1) * fD, // every recorded count — signal, interference and background — shares the pile-up and dead-time losses
+        lossFth = m.thPile ? lossF : 1;
+      LF[k] = lossF;
       for (const c of C) {
         let io = 0;
         if (m.infer) for (const l of c.near) io += Ds[l.li][l.i] * l.w;
         const S0 = Ds[c.li][c.idx] * c.I * c.ep * c.cov,
           S = S0,
-          Bk = c.bkgRate * live,
-          mean = (S + io) * puF + Bk;
+          Bk = c.bkgRate * live * lossF,
+          mean = (S + io) * lossF + Bk;
         const Tn = m.noise ? measPois(mean, rnd) : mean,
           Bn = m.noise ? measPois(Bk, rnd) : Bk;
         c.t1[k] = t1e;
@@ -434,8 +441,8 @@ async function measRun() {
         c.sig[k] = Math.hypot(c.sigStat[k], c.sigSys[k]);
         c.pu[k] = puLoss * 100;
         c.rate[k] = R;
-        c.thNet[k] = (S0 + io) * puFth;
-        c.thTot[k] = c.thNet[k] + (m.thBkg ? Bk : 0);
+        c.thNet[k] = (S0 + io) * lossFth;
+        c.thTot[k] = c.thNet[k] + (m.thBkg ? c.bkgRate * live * lossFth : 0);
         c.sTrue[k] = S;
         if (Ds[c.li][c.idx] > c.dmax) c.dmax = Ds[c.li][c.idx];
         c.iOther[k] = io;
@@ -448,6 +455,7 @@ async function measRun() {
       edges,
       live: Float64Array.from(C[0].t1, (v, k) => C[0].t2[k] - v),
       puLoss: Float64Array.from(C[0].pu, v => v / 100),
+      lossF: LF,
       C,
       N,
       NI,
@@ -669,6 +677,7 @@ function measDraw() {
     '·FWHM (keV)</th><th>peak in ROI (%)</th><th>background in ROI (cps)</th><th>Σ net counts</th><th>max pile-up (%)</th></tr></thead><tbody>' +
     rows +
     '</tbody></table></div>' +
+    measBinNote(R) +
     measSatNote(R) +
     measZeroNote(R) +
     '<div id="measSpec"></div>';
@@ -730,6 +739,20 @@ function measZeroNote(R) {
     : '';
   return diag + (out.length ? '<div class="warn"><b>Expected signal is exactly zero for:</b><ul>' + out.join('') + '</ul></div>' : '');
 }
+function measBinNote(R) {
+  // the bins of the irradiation and of the cooling may have different widths: counts per bin then jump at the end of the irradiation although the count rate is continuous
+  if (!R.NC || measSet().qty === 'rate' || Math.abs(R.dtC / R.dtI - 1) < 0.01) return '';
+  const r = R.dtC / R.dtI;
+  return (
+    '<p class="warn">The time bins are ' +
+    esc(fmtHl(R.dtI)) +
+    ' wide during the irradiation and ' +
+    esc(fmtHl(R.dtC)) +
+    ' during the cooling, so the <b>counts per bin change by a factor ' +
+    fmt(r, 3) +
+    ' at the end of the irradiation</b> although the count rate is continuous. Use the same bin width in both phases (points per time unit) or plot the count rate: <button class="btn sm" data-mqtyrate>Plot counts/s</button></p>'
+  );
+}
 function measSatNote(R) {
   // warning when the detector is saturated by the pile-up (the paralysable dead-time factor exp(−2Rτ) tends to zero)
   let rmax = 0,
@@ -743,7 +766,8 @@ function measSatNote(R) {
     if (R.NI < R.N && c0.pu[k] > 99) nsat++;
   }
   const b = measBeam(R.m),
-    tau = Math.max(0, +R.g.tau || 0);
+    tau = Math.max(0, +R.g.tau || 0),
+    tauD = Math.max(0, +R.g.tauD || 0);
   return (
     '<p class="' +
     (nsat ? 'warn' : 'hint') +
@@ -762,6 +786,13 @@ function measSatNote(R) {
     ' µs → pile-up loss up to ' +
     fmt(pmax, 4) +
     ' %' +
+    (tauD > 0
+      ? ' · DAQ dead time ' +
+        fmt(tauD, 3) +
+        ' µs (non-paralysable) → up to ' +
+        fmt((100 * rmax * tauD * 1e-6) / (1 + rmax * tauD * 1e-6), 4) +
+        ' % of the pulses lost'
+      : '') +
     (nsat
       ? ' · <b>' +
         nsat +
@@ -1018,7 +1049,7 @@ function measBkgOpts() {
     bk = measBkg(m, g);
   if (!(bk.total > 0)) return null;
   const z = MEAS.bz || (MEAS.bz = {}),
-    xl = MEAS.bxl === 'log',
+    xl = m.bxl === 'log',
     H = MEAS.bh || (MEAS.bh = {}),
     x = [],
     y = [];
@@ -1030,7 +1061,7 @@ function measBkgOpts() {
   return {
     series: [{ name: 'background', type: 'line', x, y, color: 'var(--accent)', w: 1.6, hidden: !!H.background }],
     xlog: xl,
-    ylog: (MEAS.byl || 'log') === 'log',
+    ylog: (m.byl || 'log') === 'log',
     xmin: z.xmin || (xl ? '1' : '0'),
     xmax: z.xmax || '3500',
     ymin: z.ymin || '',
@@ -1053,8 +1084,8 @@ function measBkgDraw() {
   MEAS.bo = o;
   const top = gamRen(
       pcTop({
-        y: ['data-gyl="bk"', MEAS.byl || 'log'],
-        x: ['data-bgxl="bk"', MEAS.bxl || 'lin'],
+        y: ['data-gyl="bk"', measSet().byl || 'log'],
+        x: ['data-bgxl="bk"', measSet().bxl || 'lin'],
         reset: ['data-gzreset="bk"', gamZoomed(MEAS.bz)]
       }),
       'b'
@@ -1184,7 +1215,6 @@ function measBuild() {
     fld('Cooling time unit', sel('tcU', actUnits)) +
     fld('Points per cooling time unit', nI('ppuC', 'min="0.01"')) +
     fld('Time unit of the plot axis', sel('xU', [['auto', 'automatic (longer phase)']].concat(actUnits))) +
-    fld('ROI half-width (× FWHM)', nI('roiK', 'min="0.1" step="0.1"')) +
     fld('Beam-current uncertainty (%, relative)', nI('dI', 'min="0" step="any"')) +
     fld('Ge efficiency uncertainty (%, relative)', nI('dE', 'min="0" step="any"')) +
     '</div>' +
@@ -1229,11 +1259,16 @@ function measBuild() {
     chk('noise', 'Poisson fluctuations') +
     chk('pile', 'apply pile-up losses to the counts') +
     chk('infer', 'count neighbouring γ lines of other nuclides in the ROI') +
+    '</div>' +
+    '<details><summary>Advanced: ROI width and random seed</summary><div class="btns" style="margin-top:8px">' +
+    '<label class="fld" style="flex-direction:row;align-items:center;gap:6px"><span>ROI half-width (× FWHM)</span><input type="number" data-mk="roiK" step="0.1" min="0.1" value="' +
+    m.roiK +
+    '" style="width:100px"></label>' +
     '<label class="fld" style="flex-direction:row;align-items:center;gap:6px"><span>Random seed</span><input type="number" data-mk="seed" step="1" value="' +
     m.seed +
     '" style="width:120px"></label>' +
     chk('newSeed', 'new seed at every “Simulate Experiment”') +
-    '</div>' +
+    '</details>' +
     '<p class="hint" id="measInfo">' +
     measInfoHtml() +
     '</p>' +
@@ -1545,6 +1580,14 @@ document.addEventListener('click', async ev => {
     }
     return;
   }
+  if (ev.target.closest('[data-mqtyrate]')) {
+    const q = $('#measWin [data-mk=qty]');
+    if (q) {
+      q.value = 'rate';
+      q.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    return;
+  }
   if (ev.target.closest('[data-bgzr]')) {
     MEAS.bz = {};
     measBkgDraw();
@@ -1630,21 +1673,24 @@ document.addEventListener('change', ev => {
   }
   const by = ev.target.closest && ev.target.closest('#measWin [data-bgyl]');
   if (by) {
-    MEAS.byl = by.value;
+    measSet().byl = by.value;
+    saveLocal();
     MEAS.bz = Object.assign({}, MEAS.bz, { ymin: '', ymax: '' });
     measBkgDraw();
     return;
   }
   const bx = ev.target.closest && ev.target.closest('#measWin [data-bgxl]');
   if (bx) {
-    MEAS.bxl = bx.value;
+    measSet().bxl = bx.value;
+    saveLocal();
     MEAS.bz = Object.assign({}, MEAS.bz, { xmin: '', xmax: '' });
     measBkgDraw();
     return;
   }
   const sy = ev.target.closest && ev.target.closest('#measWin [data-sgyl]');
   if (sy) {
-    MEAS.syl = sy.value;
+    measSet().syl = sy.value;
+    saveLocal();
     MEAS.zs = Object.assign({}, MEAS.zs, { ymin: '', ymax: '' });
     measSpecDraw();
     return;
@@ -1707,12 +1753,7 @@ document.addEventListener('change', ev => {
     if (i) i.innerHTML = measInfoHtml();
   }
   if (k === 'newSeed') return;
-  if (MEAS.res) {
-    if (['noise', 'seed'].includes(k)) {
-      const m0 = measSet();
-    }
-    measLater(300);
-  }
+  if (MEAS.res) measLater(300);
 });
 
 // ---- γ-ray spectrum in the detector for a time range of the plot ----
@@ -1775,13 +1816,19 @@ function measSpecCompute() {
     }
   }
   let wa = 0,
-    wb = 0;
+    wb = 0,
+    ta = 0,
+    tb = 0;
   for (let k = sl.i1; k < sl.i2; k++) {
-    const w = R.live[k] * R.C[0].rate[k];
-    wa += w * (R.m.pile ? 1 - R.puLoss[k] : 1);
+    const lf = R.lossF ? R.lossF[k] : R.m.pile ? 1 - R.puLoss[k] : 1,
+      w = R.live[k] * R.C[0].rate[k];
+    wa += w * lf; // signal: weighted by the pulse rate of the bin
     wb += w;
+    ta += R.live[k] * lf; // background: constant rate, weighted by time
+    tb += R.live[k];
   }
   const pf = wb > 0 ? wa / wb : 1,
+    pfB = tb > 0 ? ta / tb : 1,
     sc = pf,
     bk = R.bk,
     mu = [],
@@ -1794,12 +1841,12 @@ function measSpecCompute() {
     peaks[c] *= sc;
     cont[c] *= sc;
     dbl[c] *= sc;
-    bkgE[c] = bk.roi(c, c + 1) * live;
+    bkgE[c] = bk.roi(c, c + 1) * live * pfB; // the background counts share the pile-up and dead-time losses
     bkg[c] = R.m.noise ? measPois(bkgE[c], rnd) : bkgE[c];
     expd[c] = peaks[c] + cont[c] + dbl[c] + bkgE[c];
     tot[c] = (R.m.noise ? measPois(peaks[c] + cont[c] + dbl[c], rnd) : peaks[c] + cont[c] + dbl[c]) + bkg[c];
   } // background (any model) and signal fluctuate independently; the total is their sum
-  MEAS.spec = { nch, peaks, cont, dbl, bkg, bkgE, expd, tot, live, pf, t1: sl.t1, t2: sl.t2 };
+  MEAS.spec = { nch, peaks, cont, dbl, bkg, bkgE, expd, tot, live, pf, pfB, t1: sl.t1, t2: sl.t2 };
 }
 function measMarks(R) {
   // marks of the selected γ lines; lines closer than 0.6 keV (e.g. the 511 keV of many isotopes) share one mark and one label
@@ -1852,7 +1899,7 @@ function measSpecOpts() {
   return {
     series: ser,
     xlog: false,
-    ylog: (MEAS.syl || 'log') === 'log',
+    ylog: (measSet().syl || 'log') === 'log',
     xmin: z.xmin || '0',
     xmax: z.xmax || '',
     ymin: z.ymin || '',
@@ -1912,7 +1959,7 @@ function measSpecDraw() {
   MEAS.spg = r.geom;
   MEAS.spnames = names.map(x => x[0]);
   const leg = gamRen(gamLegend(names, MEAS.sh, 'sp'), 's'),
-    stop = gamRen(gamTop('sp', MEAS.syl || 'log', gamZoomed(MEAS.zs)), 's');
+    stop = gamRen(gamTop('sp', measSet().syl || 'log', gamZoomed(MEAS.zs)), 's');
   let tp = 0,
     tb = 0;
   for (let c = 0; c < Sp.nch; c++) {
@@ -1938,7 +1985,7 @@ function measSpecDraw() {
     fmt(tp / Math.max(Sp.live, 1e-12), 6) +
     ' counts/s</b> (background ' +
     fmt(tb / Math.max(Sp.live, 1e-12), 4) +
-    ' counts/s) · mean pile-up loss ' +
+    ' counts/s) · mean pile-up + dead-time loss ' +
     fmt((1 - Sp.pf) * 100, 3) +
     ' %' +
     ' · resolution FWHM(1 MeV) ' +

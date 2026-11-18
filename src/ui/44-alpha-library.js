@@ -449,19 +449,7 @@ function alibChannel(F, row, mt) {
         const id = r.ZA * 10 + st;
         iso.set(id, (iso.get(id) || 0) + v);
       };
-      if (r.lip > 0) {
-        add(Math.min(9, r.lip), p * m);
-        continue;
-      }
-      const is = ch.iso ? ch.iso.filter(q => q.ZA === r.ZA && q.lfs > 0) : [];
-      let f = 0;
-      for (const q of is) {
-        const fq = Math.min(1, Math.max(0, tab1Eval(q.tab, E) / s));
-        f += fq;
-        add(Math.min(9, q.lfs), p * m * fq);
-      }
-      if (f > 1) f = 1;
-      add(0, p * m * (1 - f));
+      for (const [st, fq] of chResStates(ch, r, E, s)) if (fq > 0) add(st, p * m * fq);
     }
   }
   return { P, Y, res, iso, dPdE: dP };

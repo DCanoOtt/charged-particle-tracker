@@ -429,7 +429,7 @@ function parseEndfAlpha(text, pj) {
         } else if (law === 0 || law === 3 || law === 4) {
           /* no data follow */
         } else ok = false; // LAW 7 etc.: stop reading this section
-        if (dist) dist.frame = lct === 1 ? 'lab' : lct === 3 && y.c[1] <= 4.1 ? 'lab' : 'cm';
+        if (dist) dist.frame = lct === 1 ? 'lab' : lct === 3 && y.c[1] > 4.1 ? 'lab' : 'cm'; // LCT 3: CM for light products (A ≤ 4), laboratory for the heavy recoils
         ch.prods.push({ sp, zap, awp: y.c[1], ytab, dist });
       }
       ch.mf6 = true;
@@ -462,7 +462,7 @@ function parseEndfAlpha(text, pj) {
     const em = mtEmitted(mt);
     if (!em) continue;
     for (const sp of em) ch.y[sp] = (typeof ch.y[sp] === 'number' ? ch.y[sp] : 0) + 1;
-    let za = ZA + 2004;
+    let za = ZA + pj.Z * 1000 + pj.A; // compound nucleus = target + projectile
     for (const sp of em) za -= SPEC_ZA[sp];
     if (mt !== 4 && !(mt >= 103 && mt <= 107)) ch.res.push({ ZA: za, y: 1 });
   }
@@ -486,6 +486,23 @@ function chResYield(r, E) {
 }
 function chSigma(ch, E) {
   return tab1Eval(ch.tab, E);
+}
+// fractions of the residual r of a channel going to each isomeric state at energy E (s = channel cross section, barn): [[state, fraction]].
+// LIP of the MF 6 product, else the MF 10 state cross sections of the channel (fraction of the channel), else ground state; shared by the
+// activation panel (alibChannel) and the production-cross-section card, so both give identical numbers.
+function chResStates(ch, r, E, s) {
+  if (r.lip > 0) return [[Math.min(9, r.lip), 1]];
+  const out = [];
+  let f = 0;
+  if (ch.iso)
+    for (const q of ch.iso) {
+      if (q.ZA !== r.ZA || !(q.lfs > 0)) continue;
+      const fq = Math.min(1, Math.max(0, tab1Eval(q.tab, E) / s));
+      f += fq;
+      out.push([Math.min(9, q.lfs), fq]);
+    }
+  out.push([0, 1 - Math.min(f, 1)]);
+  return out;
 }
 
 // ENDF-style file name of a library file for an isotope:  a-Ar040.tendl

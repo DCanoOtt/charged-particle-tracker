@@ -421,24 +421,32 @@ function chartReadout(o, geom, svgEl, ev) {
         val = s.y[lo];
       }
     } else if (s.type !== 'pts') {
-      const xs = s.x;
-      let best = -1,
-        bd = Infinity;
-      const n = xs.length;
-      if (n < 4000) {
-        for (let i = 0; i < n; i++) {
-          const d = Math.abs(xs[i] - X);
-          if (d < bd && isFinite(s.y[i])) {
-            bd = d;
-            best = i;
-          }
+      // x is ascending in every series of the app: binary search for the nearest point
+      const xs = s.x,
+        n = xs.length;
+      if (n) {
+        let lo = 0,
+          hi = n - 1;
+        while (hi - lo > 1) {
+          const mid = (lo + hi) >> 1;
+          if (xs[mid] <= X) lo = mid;
+          else hi = mid;
         }
-        if (best >= 0) val = s.y[best];
+        let best = Math.abs(xs[hi] - X) < Math.abs(xs[lo] - X) ? hi : lo;
+        if (!isFinite(s.y[best]))
+          for (const d of [1, -1, 2, -2, 3, -3]) {
+            const j = best + d;
+            if (j >= 0 && j < n && isFinite(s.y[j])) {
+              best = j;
+              break;
+            }
+          }
+        if (isFinite(s.y[best])) val = s.y[best];
       }
     }
     if (val != null && isFinite(val)) out.push(s.name + ' = ' + fmt(val, 4));
   });
-  return { X, text: 'x = ' + fmt(X, 5) + (out.length ? '   |   ' + out.join('   |   ') : ''), px: geom.xlog ? px : px };
+  return { X, text: 'x = ' + fmt(X, 5) + (out.length ? '   |   ' + out.join('   |   ') : ''), px: px };
 }
 function histo(vals, nb, lo, hi) {
   const c = new Float64Array(nb),

@@ -14,6 +14,7 @@ const GAM_DEF = {
   top: 8,
   emax: 0,
   tau: 1,
+  tauD: 0,
   ftp: 1,
   puCurve: false,
   ftpMode: 'auto',

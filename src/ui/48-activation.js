@@ -61,6 +61,8 @@ const actUnits = [
   ['d', 'days'],
   ['y', 'years']
 ];
+const DEC_MSG0 =
+  'The internal database is used. Evaluated decay sub-library files (e.g. ENDF/B-VIII.0 decay, JEFF-3.3/4.0 RDD, JENDL-5 DDF) can be loaded from a folder or as individual files.';
 let ACT_CTX = null,
   ACT_TMR = null,
   ACT_GEN = 0;
@@ -177,16 +179,7 @@ function actRender() {
       ) +
       '</div>' +
       '<p class="hint" id="decMsg">' +
-      esc(
-        ENS.busy
-          ? ENS.prog
-          : DEC.busy
-            ? DEC.prog
-            : s.src === 'ens' && ENS.msg
-              ? ENS.msg
-              : DEC.msg ||
-                'The internal database is used. Evaluated decay sub-library files (e.g. ENDF/B-VIII.0 decay, JEFF-3.3/4.0 RDD, JENDL-5 DDF) can be loaded from a folder or as individual files.'
-      ) +
+      esc(ENS.busy ? ENS.prog : DEC.busy ? DEC.prog : s.src === 'ens' && ENS.msg ? ENS.msg : DEC.msg || DEC_MSG0) +
       '</p>' +
       '<input type="file" id="decInput" webkitdirectory directory multiple hidden><input type="file" id="decInputF" multiple hidden><div id="actRes"></div>';
   } else

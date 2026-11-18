@@ -33,21 +33,6 @@ function xsParse(str) {
 function xsLayerLabel(lay) {
   return lay === 'all' || +lay >= S.layers.length ? 'all layers' : 'layer ' + (+lay + 1) + ' · ' + layerName(S.layers[+lay], +lay);
 }
-// fractions of the residual r of channel ch at energy E (barn σ of the channel) going to each state: [[state, fraction]]
-function xsStates(ch, r, E, s) {
-  if (r.lip > 0) return [[Math.min(9, r.lip), 1]];
-  const is = ch.iso ? ch.iso.filter(q => q.ZA === r.ZA && q.lfs > 0) : [],
-    out = [];
-  let f = 0;
-  for (const q of is) {
-    const fq = Math.min(1, Math.max(0, tab1Eval(q.tab, E) / s));
-    f += fq;
-    out.push([Math.min(9, q.lfs), fq]);
-  }
-  if (f > 1) out.forEach(o => (o[1] /= f)), (f = 1);
-  out.push([0, 1 - f]);
-  return out;
-}
 // rows (isotope × layer) of the selection with their weights (atom fractions of the selected layers)
 function xsRows(lay) {
   const all = alibTargetIsotopes().filter(t => lay === 'all' || +lay >= S.layers.length || t.layer === +lay);
@@ -99,7 +84,7 @@ function xsCurve(it, Emax) {
           const m = chResYield(r, E);
           if (!(m > 0)) continue;
           if (it.st < 0) sum += s * m;
-          else for (const [st, f] of xsStates(ch, r, E, s)) if (st === it.st) sum += s * m * f;
+          else for (const [st, f] of chResStates(ch, r, E, s)) if (st === it.st) sum += s * m * f;
         }
       }
       v += row.w * sum;
@@ -208,6 +193,8 @@ function xsRender() {
     key = [P.letter, S.layers.length, S.layers.map(l => layerName(l)).join(',')].join('|');
   if (card.dataset.key !== key) {
     card.dataset.key = key;
+    if (s.xsYl === 'log' || s.xsYl === 'lin') XS.yl = s.xsYl;
+    if (s.xsXl === 'log' || s.xsXl === 'lin') XS.xl = s.xsXl;
     card.innerHTML =
       '<h2 data-fold tabindex="0" role="button" title="Click to collapse or expand">Production cross sections</h2><p class="hint">Cross section for the production of a residual nucleus as a function of the energy of the incident ' +
       P.name +
@@ -400,12 +387,14 @@ document.addEventListener('change', ev => {
   const t = ev.target;
   if (!t.closest || !t.closest('#cXs')) return;
   if (t.matches('[data-xgyl]')) {
-    XS.yl = t.value;
+    XS.yl = irrSet().xsYl = t.value;
+    saveLocal();
     XS.z = Object.assign({}, XS.z, { ymin: '', ymax: '' });
     return xsDraw();
   }
   if (t.matches('[data-xgxl]')) {
-    XS.xl = t.value;
+    XS.xl = irrSet().xsXl = t.value;
+    saveLocal();
     XS.z = Object.assign({}, XS.z, { xmin: '', xmax: '' });
     return xsDraw();
   }

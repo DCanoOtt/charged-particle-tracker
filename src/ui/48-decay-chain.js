@@ -566,7 +566,10 @@ function dkMul(A, B, n) {
   for (let q = 0; q < C.length; q++) if (C[q] < 1e-280 && C[q] > -1e-280) C[q] = 0; // no denormals
   return C;
 }
-function dkExpChain(A, n, h, K) {
+async function dkExpChain(A, n, h, K) {
+  // large networks: yield to the event loop every few O(n³) products, so the page stays responsive
+  let _yc = 0;
+  const Y = () => (n > 120 && ++_yc % 3 === 0 ? new Promise(r => setTimeout(r, 0)) : null);
   // [exp(A h), exp(A 2h), …, exp(A 2^K h)]
   // A is lower triangular, so the diagonal of every exp(A t) is exactly exp(A_ii t): it is imposed after every squaring, which removes the
   // amplification of the rounding error of (1 − λh) by the repeated squaring; the off-diagonal elements are sums of non-negative terms
@@ -590,6 +593,7 @@ function dkExpChain(A, n, h, K) {
   let T = new Float64Array(A.length);
   for (let i = 0; i < n; i++) T[dkIx(i) + i] = 1;
   for (let k = 13; k >= 1; k--) {
+    await Y();
     const M = dkMul(B, T, n);
     for (let q = 0; q < M.length; q++) M[q] /= k;
     for (let i = 0; i < n; i++) M[dkIx(i) + i] += 1;
@@ -598,12 +602,14 @@ function dkExpChain(A, n, h, K) {
   let e = h / Math.pow(2, s);
   setDiag(T, e);
   for (let q = 0; q < s; q++) {
+    await Y();
     T = dkMul(T, T, n);
     e *= 2;
     setDiag(T, e);
   }
   const out = [T];
   for (let j = 1; j <= K; j++) {
+    await Y();
     T = dkMul(T, T, n);
     e *= 2;
     setDiag(T, e);
@@ -731,7 +737,7 @@ async function dkSolve(Q) {
       for (let j = 0; d > 0; j++, d = Math.floor(d / 2)) if (d % 2) x = dkApply(chain[j], x, nn);
       return x;
     };
-  let chain = dkExpChain(A, nn, hI, K),
+  let chain = await dkExpChain(A, nn, hI, K),
     x = new Float64Array(nn),
     prev = 0;
   x[0] = 1;
@@ -744,7 +750,7 @@ async function dkSolve(Q) {
   chain = null;
   if (nC) {
     await new Promise(r => setTimeout(r, 0));
-    const c2 = dkExpChain(A, nn, hC, K);
+    const c2 = await dkExpChain(A, nn, hC, K);
     let y = Float64Array.from(X[X.length - 1]);
     y[0] = 0;
     prev = 0;

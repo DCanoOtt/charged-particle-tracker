@@ -13,6 +13,8 @@ function decUiSync() {
         ? 'Load ENDF-6 decay files (MF 8 / MT 457: ENDF/B, JEFF, JENDL)'
         : 'Load decay data: first choose the format in “Decay data”';
   for (const b of [b1, b2]) if (b) b.disabled = s.src !== 'ens' && s.src !== 'file';
+  const pm = $('#decMsg'); // the status line follows every load and source change, without a rebuild of the card
+  if (pm) pm.textContent = ENS.busy ? ENS.prog : DEC.busy ? DEC.prog : (s.src === 'ens' && ENS.msg) || DEC.msg || DEC_MSG0;
 }
 function actUpdate() {
   decUiSync();
@@ -106,10 +108,7 @@ async function actCompute(my) {
       });
       if (my !== ACT_GEN) return;
     } else if (src === 'file') {
-      await decPrefetch(
-        Array.from(prod.keys()).filter(() => false),
-        !!s.fb
-      );
+      await decPrefetch([], !!s.fb); // no chain following: only the status line is refreshed
       for (const id of prod.keys()) if (!DEC.map.has(id) && !DEC.miss.has(id) && DEC.idx.has(id)) await decReadId(id);
     }
     const sol = await dkSolve({ prod, info, Tirr, Tc, chain: !!s.chain });
@@ -291,7 +290,7 @@ async function actCompute(my) {
     order = rows.slice().sort((a, b) => a.li - b.li || b.A0 - a.A0 || b.N0 - a.N0);
   const sorted = order.filter(r => s.show === 'all' || (r.e && r.e.st === 'stable' ? false : true));
   const stTxt = r => (!r.e ? 'not in table' : r.e.st === 'stable' ? 'stable' : r.e.T ? fmtHl(r.e.T) : 'T½ n/a'),
-    orig = r => (r.direct ? ((r.A0 > 0 || r.N0 > 0) && r.Rt > 0 ? 'direct' : 'direct') : 'ingrowth');
+    orig = r => (r.direct ? 'direct' : 'ingrowth');
   const gamAvail = sorted.some(r => r.gt > 0);
   const tr = sorted
     .map(

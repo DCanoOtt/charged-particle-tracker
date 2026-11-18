@@ -137,7 +137,7 @@ function setupLayerSummary(l, i) {
   };
 }
 function setupFileName() {
-  // layers in stack order: symbols + thickness + unit + phase (s/l/g), joined by “_”, then the code version; e.g. Si100um-s_Ar1cm-g_v0.1.5.setup.json
+  // layers in stack order: symbols + thickness + unit + phase (s/l/g), joined by “_”, then the code version; e.g. Si100um-s_Ar1cm-g_v0.1.6.setup.json
   const part = (l, i) => {
     const q = setupLayerSummary(l, i),
       u = String(q.unit).replace(/µ/g, 'u').replace(/²/g, '2').replace(/\//g, '-');

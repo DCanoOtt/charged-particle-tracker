@@ -136,5 +136,34 @@ def make_jendl_alpha(path=None):
     txt = '\n'.join(w.out) + '\n'
     if path: open(path, 'w').write(txt)
     return txt
+def make_neutron(pathH=None, pathC=None):
+    """Synthetic incident-neutron files in ENDF/B-VIII.0 layout: n+1H (MF3 MT2, MF4 MT2 Legendre) and n+12C (MF3 MT2, 4, 51, 52, 91, 102, 103, 107; MF4 MT2 tabulated)."""
+    def head(w, ZA, AWR, name):
+        w.out.append('%-66s%4d%2d%3d%5d' % (' ' + name, 0, 0, 0, 0))
+        w.line([float(ZA), AWR, -1, 0, 0, 0], 1, 451); w.line([0.0, 0.0, 0, 0, 0, 0], 1, 451); w.end(1, 451); w.end(1, 0)
+    Es = [1e3 * 1.15 ** k for k in range(0, 90)]; Es = [e for e in Es if e <= 4.0e7]; Em = [e * 1e-6 for e in Es]
+    w = W(125); head(w, 1001, 0.99917, 'n+H1 synthetic test')
+    sig = []
+    for e in Em:
+        k2 = e / 82.94; k = math.sqrt(k2)
+        cT = (-1 / 5.424 + 0.5 * 1.759 * k2) / k; cS = (1 / 23.74 + 0.5 * 2.77 * k2) / k
+        sig.append(4 * math.pi / k2 * (0.75 / (1 + cT * cT) + 0.25 / (1 + cS * cS)) * 0.01)
+    w.line([1001.0, 0.99917, 0, 0, 0, 0], 3, 2); w.tab1(0.0, 0.0, 0, 0, Es, sig, 3, 2); w.end(3, 2); w.end(3, 0)
+    w.line([1001.0, 0.99917, 0, 1, 0, 0], 4, 2); w.line([0.0, 0.99917, 0, 2, 0, 0], 4, 2); w.tab2(2, 4, 2)
+    w.lst(0.0, 1e6, 0, 0, [0.0, 0.0], 0, 4, 2); w.lst(0.0, 4e7, 0, 0, [0.2, 0.0], 0, 4, 2)
+    w.end(4, 2); w.end(4, 0); w.out.append('%66s%4d%2d%3d%5d' % ('', -1, 0, 0, 0))
+    if pathH: open(pathH, 'w').write('\n'.join(w.out) + '\n')
+    w = W(600); head(w, 6012, 11.8969, 'n+C12 synthetic test')
+    def sg(thr, peak): return [0.0 if e < thr else peak * (1 - math.exp(-(e - thr) / 3.0)) * math.exp(-(e - thr) / 15.0) for e in Em]
+    el = [1.5 + 3.0 * math.exp(-e) for e in Em]; i51 = sg(4.81, 0.3); i52 = sg(8.3, 0.12); i91 = sg(12.5, 0.2); c102 = [0.001 * math.exp(-e) for e in Em]; c103 = sg(13.7, 0.04); c107 = sg(6.2, 0.07)
+    i4 = [a + b + c for a, b, c in zip(i51, i52, i91)]
+    for mt, ys, q in [(2, el, 0.0), (4, i4, 0.0), (51, i51, -4.439e6), (52, i52, -7.654e6), (91, i91, -11.5e6), (102, c102, 4.9e6), (103, c103, -12.587e6), (107, c107, -5.702e6)]:
+        w.line([6012.0, 11.8969, 0, 0, 0, 0], 3, mt); w.tab1(q, q, 0, 0, Es, ys, 3, mt); w.end(3, mt)
+    w.end(3, 0)
+    w.line([6012.0, 11.8969, 0, 2, 0, 0], 4, 2); w.line([0.0, 11.8969, 0, 2, 0, 0], 4, 2); w.tab2(2, 4, 2)
+    for E in (1e6, 4e7): w.tab1(0.0, E, 0, 0, [-1.0, 0.0, 1.0], [0.1, 0.4, 1.5] if E > 1e6 else [0.5, 0.5, 0.5], 4, 2)
+    w.end(4, 2); w.end(4, 0); w.out.append('%66s%4d%2d%3d%5d' % ('', -1, 0, 0, 0))
+    if pathC: open(pathC, 'w').write('\n'.join(w.out) + '\n')
+if __name__ == '__main__' and len(sys.argv) > 1 and sys.argv[1] == 'neutron': make_neutron('tests/data/n_001-H-001.endf', 'tests/data/n_006-C-012.endf'); sys.exit(0)
 if __name__ == '__main__' and len(sys.argv) > 1 and sys.argv[1] == 'jendl': make_jendl(sys.argv[2] if len(sys.argv) > 2 else 'tests/data/d_003-Li-006.dat'); make_jendl_alpha(sys.argv[3] if len(sys.argv) > 3 else 'tests/data/a_013-Al-027.dat'); sys.exit(0)
 if __name__ == '__main__': make(path=sys.argv[1] if len(sys.argv) > 1 else 'tests/data/a-Ar040.tendl', scale=float(sys.argv[2]) if len(sys.argv) > 2 else 1.0)

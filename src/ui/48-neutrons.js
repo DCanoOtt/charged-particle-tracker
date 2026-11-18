@@ -9,12 +9,48 @@ const NEU_DEF = {
   tirr: 1,
   tirrU: 'h',
   lay: 'all',
+  L: 25,
+  dt: 3,
   qty: 'rate',
   nyl: 'log',
   nxl: 'lin',
   vyl: 'lin',
   vxl: 'lin'
 };
+const NEU_MC2 = 939.56542,
+  NEU_C = 0.299792458; // neutron rest energy (MeV), speed of light (m/ns)
+// time of flight (ns) and |dE/dt| (MeV/ns) of a neutron of kinetic energy E (MeV) over L metres; sigma_E of a time resolution st (ns, 1 sigma)
+function neuKin(E, L) {
+  const g = 1 + E / NEU_MC2,
+    b = Math.sqrt(1 - 1 / (g * g)),
+    t = L / (b * NEU_C);
+  return { t, dEdt: (NEU_MC2 * g * g * g * b * b) / t };
+}
+const neuSigE = (E, L, st) => neuKin(E, L).dEdt * st;
+// Gaussian smearing of a spectrum y (per MeV, nbo bins up to Eo) with the energy-dependent width of the time resolution; the integral is kept
+function neuFold(y, nbo, Eo, L, st) {
+  const dE = Eo / nbo,
+    out = new Float64Array(nbo);
+  for (let i = 0; i < nbo; i++) {
+    if (!(y[i] > 0)) continue;
+    const sg = neuSigE((i + 0.5) * dE, L, st);
+    if (!(sg > dE / 2)) {
+      out[i] += y[i];
+      continue;
+    }
+    const j0 = Math.max(0, Math.floor(i - (5 * sg) / dE)),
+      j1 = Math.min(nbo - 1, Math.ceil(i + (5 * sg) / dE)),
+      w = [];
+    let sum = 0;
+    for (let j = j0; j <= j1; j++) {
+      const v = Math.exp((-0.5 * ((j - i) * dE) ** 2) / (sg * sg));
+      w.push(v);
+      sum += v;
+    }
+    for (let j = j0; j <= j1; j++) out[j] += (y[i] * w[j - j0]) / sum;
+  }
+  return out;
+}
 const NEU_ANG0 = [0, 30, 60, 90, 120, 150, 180]; // default angles (replaced by the nearest ENDF angles when the file has a grid)
 const NEU_INT = { 1: 'histogram', 2: 'linear-linear', 3: 'linear-log', 4: 'log-linear', 5: 'log-log' };
 const NEU_QTY = {
@@ -186,6 +222,7 @@ function neuRender() {
       fld('Layer', sel('lay', layOpts())) +
       '</div>' +
       '<div class="row3">' +
+      '<div class="fld"><span>Flight path, time resolution, detector efficiency</span><div class="btns" style="margin:0"><button class="btn pri" data-ndopen style="font-weight:700;padding:8px 14px">Configure neutron detector</button></div></div>' +
       fld(
         'Quantity in the plots',
         sel('qty', [
@@ -429,24 +466,18 @@ function neuPrep() {
     for (let j = 0; j < r.nbo; j++) if (a[j] > 1e-4 * mx) last = Math.max(last, j);
   });
   const n = {
-    series: r.angs.map((a, i) => ({
-      name: 'θ = ' + fmt(a, 5) + '°',
-      type: 'hist',
-      edges,
-      y: Float64Array.from(r.cs.ang[i], v => v * f),
-      color: scol(i)
-    })),
+    series: r.cs.ang.map((a, i) => ({ name: 'θ = ' + fmt(r.angs[i], 5) + '°', type: 'hist', edges, y: Float64Array.from(a, v => v * f), color: scol(i) })),
     xlabel: 'Neutron energy (MeV)',
     ylabel: q.t + ' (' + q.u + ' MeV⁻¹)',
-    title: 'Neutron spectra · ' + beam,
-    stats: ['Target: ' + mats],
+    title: 'Neutron spectra emitted from the target · ' + beam,
+    stats: ['Target: ' + mats + ' · ideal spectra at the target (no flight path, no detector, no resolution)'],
     xmaxAuto: String(fmt(((last + 2) * r.Eo) / r.nbo, 4))
   };
   const xs = r.grid,
     ys = r.Yg.map(v => v * f);
   const m = {
     series: [
-      { name: 'all neutron energies', type: 'line', x: Array.from(xs), y: ys, color: scol(0), w: 1.8 },
+      { name: 'integrated over all neutron energies', type: 'line', x: Array.from(xs), y: ys, color: scol(0), w: 1.8 },
       {
         name: 'selected angles',
         type: 'pts',
@@ -490,7 +521,7 @@ function neuOpts(k) {
     series,
     xlog,
     ylog,
-    xmin: z.xmin || (k === 'n' && !xlog ? '0' : ''),
+    xmin: z.xmin || (k === 'n' && !xlog && !d.tof ? '0' : ''),
     xmax: z.xmax || (k === 'n' ? d.xmaxAuto : ''),
     ymin: z.ymin || '',
     ymax: z.ymax || '',

@@ -480,7 +480,7 @@ with sync_playwright() as p:
     check('background preview: zoom enables Reset zoom, which clears it', bz == [False, True], bz)
     sj = pg.evaluate("(()=>{const o=JSON.parse(setupJSON()); return [o.codeVersion, o.layerSummary[0]]})()")
     fn = pg.evaluate("setupFileName()")
-    check('setup file name = symbols + thickness + unit + phase per layer, then the code version', fn.endswith('_v0.1.3.setup.json') and '-g_' in fn, fn)
+    check('setup file name = symbols + thickness + unit + phase per layer, then the code version', fn.endswith('_v0.1.5.setup.json') and '-g_' in fn, fn)
     check('setup file lists symbols, thickness, unit, phase (s/l/g) per layer and the code version', sj[0] and sj[1]['symbols'] and sj[1]['thickness'] > 0 and sj[1]['unit'] and sj[1]['phase'] in ('s', 'l', 'g'), sj)
     ex = pg.evaluate("[measCsv(',').split('\\n').filter(l=>l && l[0]!=='#').length, measRootHists().length, measRootHists()[0].name, measCsv(',').indexOf('sigma_syst')>0]")
     check('CSV rows and ROOT histograms per isotope-γ combination', ex[0] == 1 + MEAS.res_n if False else ex[0] > 24 and ex[1] % 8 == 0 and ex[1] > 0 and ex[3], ex)

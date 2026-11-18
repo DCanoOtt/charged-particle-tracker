@@ -63,6 +63,46 @@ function d1Eval(d, Ein, Ep, mu, ac) {
     t = (Ein - E[lo]) / (E[lo + 1] - E[lo]);
   return (1 - t) * d1List(d, d.L[lo], Ep, mu, ac) + t * d1List(d, d.L[lo + 1], Ep, mu, ac);
 }
+// MF6 LAW 7 (laboratory angle-energy table): f(E', mu) per MeV and per unit mu, at the incident energy Ein; d7Tot is its integral over mu (the energy distribution)
+function d7Br(d, Ein) {
+  const E = d.E,
+    n = E.length;
+  if (Ein <= E[0]) return [0, 0, 0];
+  if (Ein >= E[n - 1]) return [n - 1, n - 1, 0];
+  const lo = secLoc(E, Ein);
+  return [lo, lo + 1, (Ein - E[lo]) / (E[lo + 1] - E[lo])];
+}
+function d7At(Lk, mu, Ep) {
+  const m = Lk.mu,
+    n = m.length;
+  if (n === 1 || mu <= m[0]) return tab1Eval(Lk.T[0], Ep);
+  if (mu >= m[n - 1]) return tab1Eval(Lk.T[n - 1], Ep);
+  const lo = secLoc(m, mu),
+    t = (mu - m[lo]) / (m[lo + 1] - m[lo]);
+  return (1 - t) * tab1Eval(Lk.T[lo], Ep) + t * tab1Eval(Lk.T[lo + 1], Ep);
+}
+function d7Eval(d, Ein, mu, Ep) {
+  const [a, b, t] = d7Br(d, Ein),
+    f = d7At(d.L[a], mu, Ep);
+  return t > 0 ? (1 - t) * f + t * d7At(d.L[b], mu, Ep) : f;
+}
+function d7Int(Lk, Ep) {
+  let s = 0;
+  const m = Lk.mu;
+  if (m.length === 1) return 2 * tab1Eval(Lk.T[0], Ep);
+  let g0 = tab1Eval(Lk.T[0], Ep);
+  for (let j = 1; j < m.length; j++) {
+    const g1 = tab1Eval(Lk.T[j], Ep);
+    s += 0.5 * (g0 + g1) * (m[j] - m[j - 1]);
+    g0 = g1;
+  }
+  return s;
+}
+function d7Tot(d, Ein, Ep) {
+  const [a, b, t] = d7Br(d, Ein),
+    f = d7Int(d.L[a], Ep);
+  return t > 0 ? (1 - t) * f + t * d7Int(d.L[b], Ep) : f;
+}
 // MF6 LAW 2: normalised angular pdf f(mu)
 function d2List(L, mu) {
   if (L.lang === 0) {
@@ -154,6 +194,15 @@ function secEmit(pr, ch, tgt, E, W, tot, ang, nbo, dEo, cosT, sinT, kin) {
   const AWR = tgt.AWR;
   if (pr.sp === 'g') {
     if (pr.dist.law === 1) secPhoton(pr.dist, E, W, tot, nbo, dEo);
+    return;
+  }
+  if (pr.dist.law === 7) {
+    // tabulated in the laboratory: no kinematics needed
+    for (let j = 0; j < nbo; j++) {
+      const Eo = (j + 0.5) * dEo;
+      tot[j] += W * d7Tot(pr.dist, E, Eo);
+      for (let i = 0; i < cosT.length; i++) ang[i][j] += (W * d7Eval(pr.dist, E, cosT[i], Eo)) / (2 * Math.PI);
+    }
     return;
   }
   const d = pr.dist,
@@ -278,6 +327,7 @@ function secKinds(F, li, sp, sel) {
     else if (d.law === 2)
       k.add('two-body discrete level, CM, ' + (d.L.some(L => L.lang === 0 && !L.a.length) ? 'isotropic' : 'angular distribution from the file'));
     else if (d.law === 6) k.add('N-body phase space, isotropic in the CM');
+    else if (d.law === 7) k.add('tabulated angle-energy distribution, lab (LAW 7)');
   }
   return Array.from(k).join('; ');
 }
@@ -315,6 +365,13 @@ function secBound(F, li, sp, sel, kin) {
         const AR = AWR + PJ().awi - Ap;
         b = Math.max(b, Math.pow(Math.sqrt((AR / (AR + Ap)) * q) + w, 2));
       }
+    } else if (d.law === 7) {
+      let m = 0;
+      for (let i = 0; i < d.L.length; i++) {
+        for (const T of d.L[i].T) m = Math.max(m, T.x[T.x.length - 1] || 0);
+        if (d.E[i] >= Emax) break;
+      }
+      b = Math.max(b, m);
     } else if (d.law === 6) {
       const ps = d6Make(d, Ap, Ecm + ch.QM);
       if (ps) b = Math.max(b, Math.pow(Math.sqrt(ps.Em) + w, 2));

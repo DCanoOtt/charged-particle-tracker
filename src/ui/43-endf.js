@@ -127,6 +127,14 @@ class EndfCursor {
     v.length = n;
     return { c, v: Float64Array.from(v) };
   }
+  skipTab1() {
+    // TAB1 record without storing the data (CONT + interpolation lines + data lines)
+    const c = this.cont(),
+      n = Math.ceil((2 * (c[4] | 0)) / 6) + Math.ceil((2 * (c[5] | 0)) / 6);
+    if (this.i + n > this.end) throw new Error('ENDF: unexpected end of section');
+    this.i += n;
+    return c;
+  }
   skipTab2() {
     const c = this.cont(),
       NR = c[4] | 0;
@@ -176,6 +184,33 @@ function readLaw1(cur) {
     L.push({ Ep, f0, p, disc });
   }
   return lang === 1 || lang === 2 ? { law: 1, lang, lep, E, L } : null;
+}
+// LAW 7 (laboratory angle-energy, JENDL-5): for every incident energy a set of μ values, each with a TAB1 f(E') (E' in MeV, f per MeV and per unit μ; ∫∫ f dE' dμ = 1)
+function readLaw7(cur) {
+  const t2 = cur.skipTab2(),
+    NE = t2[5] | 0,
+    E = new Float64Array(NE),
+    L = [];
+  for (let e = 0; e < NE; e++) {
+    const t3 = cur.skipTab2(),
+      NM = t3[5] | 0,
+      mu = new Float64Array(NM),
+      T = [];
+    E[e] = t3[1] * 1e-6;
+    for (let m = 0; m < NM; m++) {
+      const t = cur.tab1(),
+        x = new Float64Array(t.x.length),
+        y = new Float64Array(t.y.length);
+      for (let i = 0; i < x.length; i++) {
+        x[i] = t.x[i] * 1e-6;
+        y[i] = t.y[i] * 1e6;
+      }
+      mu[m] = t.c[1];
+      T.push({ x, y, nbt: t.nbt, int: t.int });
+    }
+    L.push({ mu, T });
+  }
+  return { law: 7, E, L, frame: 'lab' };
 }
 // LAW 2 (two-body discrete): angular distribution per incident energy; LANG 0 Legendre a_1..a_NL, LANG 12/14 tabulated (mu, f)
 function readLaw2(cur) {
@@ -257,12 +292,14 @@ const SPECIES = [
   ['a', 'α particles'],
   ['g', 'photons']
 ];
+// particle-production reactions (MF 3 = production cross section): MT 201 (z,xn), 202 (z,xγ), 203 (z,xp), 204 (z,xd), 205 (z,xt), 206 (z,x³He), 207 (z,xα)
+const PROD_MT = { 201: 'n', 202: 'g', 203: 'p', 204: 'd', 205: 't', 206: 'h', 207: 'a' };
 const SPEC_ZA = { n: 1, p: 1001, d: 1002, t: 1003, h: 2003, a: 2004 };
 // MT -> emitted particles for the channels that have no MF6 product list; null = lumped sum / not a reaction channel
 function mtEmitted(mt) {
   const m = { 16: ['n', 'n'], 17: ['n', 'n', 'n'], 22: ['n', 'a'], 28: ['n', 'p'], 102: [], 103: ['p'], 104: ['d'], 105: ['t'], 106: ['h'], 107: ['a'] };
   if (m[mt]) return m[mt];
-  if (mt >= 51 && mt <= 91) return ['n'];
+  if (mt >= 50 && mt <= 91) return ['n']; // MT 50 = (x,n0), ground state, as in the ENDF/B charged-particle sublibraries
   if (mt >= 600 && mt <= 649) return ['p'];
   if (mt >= 650 && mt <= 699) return ['d'];
   if (mt >= 700 && mt <= 749) return ['t'];
@@ -272,7 +309,7 @@ function mtEmitted(mt) {
 }
 // non-overlapping set of channels whose sum is the non-elastic cross section (MT3, MT4 and MT103-107 are lumped sums of these)
 function mtIsPrimaryChannel(mt) {
-  return mt === 5 || mt === 16 || mt === 17 || mt === 22 || mt === 28 || mt === 102 || (mt >= 51 && mt <= 91) || (mt >= 600 && mt <= 849);
+  return mt === 5 || mt === 16 || mt === 17 || mt === 22 || mt === 28 || mt === 102 || (mt >= 50 && mt <= 91) || (mt >= 600 && mt <= 849);
 }
 function mtName(mt, pj) {
   const P = (pj || PROJ.a).sym,
@@ -282,13 +319,20 @@ function mtName(mt, pj) {
   const lump = {
     2: 'elastic (nuclear + interference)',
     3: 'non-elastic (all reactions)',
-    4: x('n') + ' total, sum of MT 51-91',
+    4: x('n') + ' total, sum of MT 50-91',
     5: '(' + P + ',anything)',
     16: '(' + P + ',2n)',
     17: '(' + P + ',3n)',
     22: '(' + P + ',nα)',
     28: '(' + P + ',np)',
     102: '(' + P + ',γ)',
+    201: '(' + P + ',xn) neutron production',
+    202: '(' + P + ',xγ) photon production',
+    203: '(' + P + ',xp) proton production',
+    204: '(' + P + ',xd) deuteron production',
+    205: '(' + P + ',xt) triton production',
+    206: '(' + P + ',x³He) ³He production',
+    207: '(' + P + ',xα) α production',
     103: x('p') + ' total',
     104: x('d') + ' total',
     105: x('t') + ' total',
@@ -296,8 +340,8 @@ function mtName(mt, pj) {
     107: x('a') + ' total'
   };
   if (lump[mt]) return lump[mt];
-  const lev = (m0, m1, k) => (mt >= m0 && mt <= m1 ? (mt === m1 ? x(k) + ' continuum' : x(k) + ' to level ' + (mt - m0 + (m0 === 51 ? 1 : 0))) : null);
-  return lev(51, 91, 'n') || lev(600, 649, 'p') || lev(650, 699, 'd') || lev(700, 749, 't') || lev(750, 799, 'h') || lev(800, 849, 'a') || 'MT ' + mt;
+  const lev = (m0, m1, k) => (mt >= m0 && mt <= m1 ? (mt === m1 ? x(k) + ' continuum' : x(k) + ' to level ' + (mt - m0)) : null);
+  return lev(50, 91, 'n') || lev(600, 649, 'p') || lev(650, 699, 'd') || lev(700, 749, 't') || lev(750, 799, 'h') || lev(800, 849, 'a') || 'MT ' + mt;
 }
 
 // -- parse a whole alpha file; returns { ZA, Z, A, title, channels: {mt: ch}, order: [mt...] } --
@@ -369,7 +413,7 @@ function parseEndfAlpha(text, pj) {
   for (const mt of order) channels[mt].primary = (mt <= 117 || (mt >= 600 && mt <= 849)) && ![1, 2, 3, 27, 101].includes(mt) && mt !== pj.own0; // the ground-state channel of the projectile's own species is elastic scattering
   const lumpNotes = [];
   for (const [L, m0, m1] of [
-    [4, 51, 91],
+    [4, 50, 91],
     [103, 600, 649],
     [104, 650, 699],
     [105, 700, 749],
@@ -414,8 +458,9 @@ function parseEndfAlpha(text, pj) {
           yt = toMeV(y);
         const ytab = { x: yt.x, y: y.y, nbt: y.nbt, int: y.int };
         const sp = ZAP_SPECIES[zap];
-        if (sp) ch.y[sp] = ch.y[sp] ? { sum: [ch.y[sp], ytab] } : ytab;
-        else if (zap > 2004) ch.res.push({ ZA: zap, lip: y.c[2] | 0, y: ytab });
+        if (sp)
+          ch.y[sp] = ch.y[sp] ? { sum: [...(ch.y[sp].sum || [ch.y[sp]]), ytab] } : ytab; // a product listed several times: the yields add up
+        else if (zap > 1003) ch.res.push({ ZA: zap, lip: y.c[2] | 0, y: ytab }); // residual nuclei (ZAP = 1000 Z + A; includes the unbound H-4, H-5 of the JENDL files)
         let dist = null;
         if (law === 1) dist = readLaw1(cur);
         else if (law === 2) dist = readLaw2(cur);
@@ -426,10 +471,11 @@ function parseEndfAlpha(text, pj) {
         } else if (law === 6) {
           const c6 = cur.cont();
           dist = { law: 6, apsx: c6[0], n: c6[5] | 0 };
-        } else if (law === 0 || law === 3 || law === 4) {
+        } else if (law === 7) dist = readLaw7(cur);
+        else if (law === 0 || law === 3 || law === 4) {
           /* no data follow */
-        } else ok = false; // LAW 7 etc.: stop reading this section
-        if (dist) dist.frame = lct === 1 ? 'lab' : lct === 3 && y.c[1] > 4.1 ? 'lab' : 'cm'; // LCT 3: CM for light products (A ≤ 4), laboratory for the heavy recoils
+        } else ok = false; // unknown LAW: stop reading this section
+        if (dist && law !== 7) dist.frame = lct === 1 ? 'lab' : lct === 3 && y.c[1] > 4.1 ? 'lab' : 'cm'; // LCT 3: CM for light products (A ≤ 4), laboratory for the heavy recoils
         ch.prods.push({ sp, zap, awp: y.c[1], ytab, dist });
       }
       ch.mf6 = true;
@@ -437,6 +483,32 @@ function parseEndfAlpha(text, pj) {
       /* truncated section: keep what was read */ ch.mf6 = ch.mf6 || Object.keys(ch.y).length > 0;
     }
   }
+  // particle-production channels MT 201-207 ((z,xn), (z,xγ), (z,xp), … as in the JENDL-5 α file: MF 3 = production cross section, MF 6 = distribution with yield 1) when no
+  // reaction channel carries that particle: merged into the total-reaction channel MT 5 as a multiplicity σ_prod/σ_MT5, so that every calculation (yields, spectra, activation) sees them
+  const host = channels[5],
+    merged = [];
+  if (host)
+    for (const mt of order) {
+      const sp = PROD_MT[mt],
+        cp = channels[mt];
+      if (!sp || !cp || !cp.prods || order.some(m => m !== mt && channels[m].primary && channels[m].y[sp] != null)) continue;
+      for (const pr of cp.prods) {
+        if (pr.sp !== sp) continue;
+        const x = cp.E,
+          y = new Float64Array(x.length);
+        for (let i = 0; i < x.length; i++) {
+          const s5 = chSigma(host, x[i]);
+          y[i] = s5 > 0 ? (cp.s[i] * tab1Eval(pr.ytab, x[i])) / s5 : 0;
+        }
+        const ytab = { x, y, nbt: [x.length], int: [2] };
+        (host.prods = host.prods || []).push({ ...pr, ytab });
+        host.y[sp] = host.y[sp] ? { sum: [...(host.y[sp].sum || [host.y[sp]]), ytab] } : ytab;
+        host.mf6 = true;
+      }
+      cp.merged = true;
+      merged.push(mt);
+    }
+  if (merged.length) lumpNotes.push('MT ' + merged.join(', ') + ' (particle production) merged into MT 5 as multiplicities');
   // MF10: cross sections for the production of individual states (isomers) of the residual nuclei
   for (const [key, [a, b]] of sec) {
     const [mf, mt] = key.split('/').map(Number);

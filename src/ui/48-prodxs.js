@@ -8,10 +8,29 @@ const xsItems = () => {
   return Array.isArray(s.xsItems) ? s.xsItems : (s.xsItems = []);
 };
 // “Ar-37”, “37Ar”, “Ar37”, “Cl-38m”, “Cl38m2”, “Cl-38g”: → { ZA, st (-1 = all states, 0 = ground, n = isomer n), label } or null
+// emitted particles (not residual nuclei): neutron, proton, deuteron, triton, helion, alpha, photon
+const XS_PART = {
+  n: ['n', 'neutron'],
+  p: ['p', 'proton'],
+  d: ['d', 'deuteron'],
+  t: ['t', 'triton'],
+  h: ['³He', 'helion'],
+  a: ['α', 'alpha'],
+  g: ['γ', 'photon']
+};
+function xsParsePart(t) {
+  const k = t.toLowerCase().replace(/s$/, '');
+  const alias = { neutron: 'n', proton: 'p', deuteron: 'd', triton: 't', helion: 'h', alpha: 'a', α: 'a', gamma: 'g', γ: 'g', photon: 'g', gammaray: 'g' };
+  const sp = XS_PART[k] ? k : alias[k] || alias[t.toLowerCase()];
+  return sp && XS_PART[sp] ? { ZA: 0, st: -1, sp, label: XS_PART[sp][0] + ' production (' + XS_PART[sp][1] + 's emitted)' } : null;
+}
 function xsParse(str) {
   const t = String(str || '')
     .trim()
     .replace(/\s+/g, '');
+  const pp =
+    /^(?:h|n|p|d|t|a|g)$/i.test(t) || /^(neutron|proton|deuteron|triton|helion|alpha|photon|gamma)s?$/i.test(t) || /^[αγ]$/.test(t) ? xsParsePart(t) : null;
+  if (pp) return pp;
   let m = /^(\d{1,3})-?([A-Za-z]{1,2})(g|m\d?)?$/.exec(t),
     A,
     sym,
@@ -59,7 +78,7 @@ function xsGrid(it, rows, Emax) {
   for (const row of rows)
     for (const mt of row.d.order) {
       const ch = row.d.channels[mt];
-      if (!ch.primary || !ch.res.some(r => r.ZA === it.ZA)) continue;
+      if (!ch.primary || !(it.sp ? ch.y[it.sp] != null : ch.res.some(r => r.ZA === it.ZA))) continue;
       for (const e of ch.E) if (e > 0 && e < Emax) set.add(e);
     }
   return Float64Array.from(Array.from(set).sort((p, q) => p - q));
@@ -76,9 +95,13 @@ function xsCurve(it, Emax) {
       let sum = 0;
       for (const mt of row.d.order) {
         const ch = row.d.channels[mt];
-        if (!ch.primary || !ch.res.length) continue;
+        if (!ch.primary || !(it.sp || ch.res.length)) continue;
         const s = chSigma(ch, E);
         if (!(s > 0)) continue;
+        if (it.sp) {
+          sum += s * chYield(ch, it.sp, E); // emitted particle: σ × multiplicity (MF 6 yield, or the reaction definition)
+          continue;
+        }
         for (const r of ch.res) {
           if (r.ZA !== it.ZA) continue;
           const m = chResYield(r, E);
@@ -102,7 +125,7 @@ function xsEmax() {
   return v > 0 ? v : Math.max(0.1, +beamE0().toPrecision(4) || 10);
 }
 function xsKey(it) {
-  return [it.ZA, it.st, it.lay, xsEmax(), xsN(), !!irrSet().xsLib, ALIB.ver, ALIB.data.size, S.layers.map(l => layerName(l)).join(',')].join('|');
+  return [it.ZA, it.sp || '', it.st, it.lay, xsEmax(), xsN(), !!irrSet().xsLib, ALIB.ver, ALIB.data.size, S.layers.map(l => layerName(l)).join(',')].join('|');
 }
 function xsData(it) {
   const k = xsKey(it);
@@ -196,10 +219,10 @@ function xsRender() {
     if (s.xsYl === 'log' || s.xsYl === 'lin') XS.yl = s.xsYl;
     if (s.xsXl === 'log' || s.xsXl === 'lin') XS.xl = s.xsXl;
     card.innerHTML =
-      '<h2 data-fold tabindex="0" role="button" title="Click to collapse or expand">Production cross sections</h2><p class="hint">Cross section for the production of a residual nucleus as a function of the energy of the incident ' +
+      '<h2 data-fold tabindex="0" role="button" title="Click to collapse or expand">Production cross sections</h2><p class="hint">Cross section for the production of a residual nucleus, or of an emitted particle (neutrons, protons, …, photons), as a function of the energy of the incident ' +
       P.name +
       ', computed from the library read in the panel “Nuclear reaction data (ENDF-6)” (sum of the primary channels, MF 3 cross section × MF 6 residual yield; isomeric states from the MF 6 / MF 10 data). For a layer with several target isotopes the value is per atom of the layer: the isotopes are weighted by their atom fraction. Give the product as <code>Ar-37</code>, <code>37Ar</code> (all states) or <code>Cl-38m</code>, <code>Cl-38g</code> (isomer or ground state), choose the layer and press “Add to the plot”; add as many curves as you wish.</p>' +
-      '<div class="row3"><label class="fld"><span>Product</span><input type="text" id="xsProd" placeholder="e.g. Ar-37" autocomplete="off" spellcheck="false"></label>' +
+      '<div class="row3"><label class="fld"><span>Product</span><input type="text" id="xsProd" placeholder="Ar-37, or n, p, α, γ…" title="A residual nucleus (Ar-37, 37Ar, Cl-38m) or an emitted particle: n, p, d, t, h (helion, ³He), a (α), g (γ); He-3 is the residual nucleus" autocomplete="off" spellcheck="false"></label>' +
       '<label class="fld"><span>Layer</span><select id="xsLay">' +
       layOpts()
         .map(o => '<option value="' + o[0] + '">' + esc(o[1]) + '</option>')
@@ -337,10 +360,12 @@ function xsAdd() {
   if (!inp) return;
   const p = xsParse(inp.value);
   if (!p) {
-    if (msg) msg.textContent = 'Product not understood: write the isotope as Ar-37, 37Ar or Cl-38m (symbol and mass number).';
+    if (msg)
+      msg.textContent =
+        'Product not understood: write the isotope as Ar-37, 37Ar or Cl-38m (symbol and mass number), or an emitted particle: n, p, d, t, h (³He), a (α), g (γ).';
     return;
   }
-  const it = { ZA: p.ZA, st: p.st, label: p.label, lay: lay.value },
+  const it = { ZA: p.ZA, st: p.st, sp: p.sp, label: p.label, lay: lay.value },
     items = xsItems();
   if (items.some(q => xsName(q) === xsName(it))) {
     if (msg) msg.textContent = xsName(it) + ' is already in the plot.';

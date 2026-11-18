@@ -15,7 +15,8 @@ const ALIB = {
   handle: null,
   need: 'none'
 };
-const ALIB_RE = /^([apdth])-([A-Z][a-z]?)(\d{3})([mn]?)\.(?:tendl|endf|dat|txt)$/i;
+// file names: TENDL  a-Ar040.tendl · JENDL-5 / IAEA  d_003-Li-006.dat · also d-Li006.endf, p-Li-6.endf; isomer files end in m or n
+const ALIB_RE = /^([apdth])[-_](?:(\d{1,3})[-_])?([A-Z][a-z]?)[-_]?(\d{1,3})([mn]?)\.(?:tendl|endf|dat|txt)$/i;
 
 function PJ() {
   const sp = beamSpec();
@@ -76,15 +77,15 @@ function alibIndexEntries(entries, name) {
   for (const en of entries) {
     const m = ALIB_RE.exec(en.name);
     if (!m) continue;
-    const Zi = ELSYM.indexOf(m[2][0].toUpperCase() + m[2].slice(1).toLowerCase());
+    const Zi = ELSYM.indexOf(m[3][0].toUpperCase() + m[3].slice(1).toLowerCase());
     if (Zi < 1) continue;
     const L = m[1].toLowerCase();
     n++;
     counts[L] = (counts[L] || 0) + 1;
-    if (m[4]) continue; // isomer (m, n) files are not used for natural targets
+    if (m[5]) continue; // isomer (m, n) files are not used for natural targets
     if (!idx.has(L)) idx.set(L, new Map());
     const mp = idx.get(L),
-      k = Zi + '-' + +m[3],
+      k = Zi + '-' + +m[4],
       old = mp.get(k);
     if (!old || (!(old.path || '').includes('TENDL-' + L) && (en.path || '').includes('TENDL-' + L))) mp.set(k, en);
   }
@@ -105,7 +106,7 @@ function alibStatus() {
     return;
   }
   if (!n) {
-    ALIB.status = 'No files named like a-Ar040.tendl, p-Ar040.tendl … were found in “' + ALIB.name + '”.';
+    ALIB.status = 'No files named like a-Ar040.tendl (TENDL) or d_018-Ar-040.dat (JENDL-5) were found in “' + ALIB.name + '”.';
     return;
   }
   const per = ['a', 'p', 'd', 't', 'h']
@@ -186,7 +187,8 @@ async function alibChoose() {
 }
 function alibFromInput(files) {
   const en = Array.from(files).map(f => ({ name: f.name, path: f.webkitRelativePath || f.name, get: async () => f }));
-  const rel = files[0] && files[0].webkitRelativePath ? files[0].webkitRelativePath.split('/')[0] : 'selected folder';
+  const rel =
+    files[0] && files[0].webkitRelativePath ? files[0].webkitRelativePath.split('/')[0] : files.length === 1 ? files[0].name : files.length + ' selected files';
   alibIndexEntries(en, rel);
   renderAlpha();
   alibAfterIndex();
@@ -359,18 +361,36 @@ function renderAlpha() {
       (rep.ok.length ? esc(rep.ok.join(', ')) : 'none') +
       (rep.miss.length ? '<br><span class="warn">No file for: ' + esc(rep.miss.join(', ')) + ' (model cross section used for those)</span>' : '') +
       '</p>';
+  if (rep && has) {
+    // energy range of the files: above the last energy of an evaluation the cross sections are zero (e.g. ENDF/B-VIII.0 d + Li-6 stops at 5 MeV)
+    const lim = [];
+    for (const [k, d] of ALIB.data) {
+      if (!d || !k.startsWith(p.letter + ':')) continue;
+      let emax = 0;
+      for (const mt of d.order) emax = Math.max(emax, d.channels[mt].E[d.channels[mt].E.length - 1] || 0);
+      if (emax > 0 && beamE0() > emax * 1.0001)
+        lim.push(k.split(':')[1].replace(/^(\d+)-(\d+)$/, (m, z, a) => (ELSYM[+z] || z) + '-' + a) + ' up to ' + +emax.toPrecision(4) + ' MeV');
+    }
+    if (lim.length)
+      info +=
+        '<p class="hint"><span class="warn">The beam energy (' +
+        +beamE0().toPrecision(4) +
+        ' MeV) is above the energy range of the evaluation: ' +
+        esc(lim.join(', ')) +
+        '. The library cross sections are zero above it, so no reactions occur there.</span></p>';
+  }
   g.innerHTML =
-    '<h2>Nuclear reaction data (ENDF-6)</h2><p class="hint">Evaluated cross sections (TENDL, ENDF-6) for reactions induced by protons, deuterons, tritons, ³He and α particles: folders <code>TENDL-p</code>, <code>TENDL-d</code>, <code>TENDL-t</code>, <code>TENDL-h</code>, <code>TENDL-a</code>, files <code>p-Ar040.tendl</code>, <code>d-…</code>, <code>t-…</code>, <code>h-…</code>, <code>a-…</code>. Choose the TENDL2025 folder (it holds all five) or a single TENDL-x folder; the library of the projectile selected now (' +
+    '<h2>Nuclear reaction data (ENDF-6)</h2><p class="hint">Evaluated cross sections (TENDL, JENDL-5, any library in ENDF-6 format) for reactions induced by protons, deuterons, tritons, ³He and α particles. File names: <code>a-Ar040.tendl</code> (TENDL) or <code>d_003-Li-006.dat</code> (JENDL-5, IAEA); the first letter is the projectile (a, p, d, t, h). TENDL folders: <code>TENDL-p</code>, <code>TENDL-d</code>, <code>TENDL-t</code>, <code>TENDL-h</code>, <code>TENDL-a</code>, files <code>p-Ar040.tendl</code>, <code>d-…</code>, <code>t-…</code>, <code>h-…</code>, <code>a-…</code>. Choose the TENDL2025 folder (it holds all five) or a single TENDL-x folder; the library of the projectile selected now (' +
     p.name +
     ': <code>' +
     p.lib +
     '</code>, files <code>' +
     p.letter +
     '-Ar040.tendl</code> …) is used and only the isotopes of the target are read. With the cross sections the reaction probability and the secondary-particle yields are obtained by folding the ion flux Φ(E) with them (tab “Reactions (ENDF)”).</p>' +
-    '<div class="btns"><button class="btn sm pri" id="alibChoose">Choose library folder…</button>' +
+    '<div class="btns"><button class="btn sm pri" id="alibChoose">Choose library folder…</button><button class="btn sm" id="alibChooseF" title="Select one or several ENDF-6 files, e.g. d_003-Li-006.dat (JENDL-5) or a-Ar040.tendl (TENDL)">Choose file(s)…</button>' +
     (ALIB.need !== 'none' && !ALIB.nFiles ? '<button class="btn sm" id="alibRestore">Reconnect “' + esc(ALIB.need) + '”</button>' : '') +
     (has ? '<button class="btn sm" id="alibReload">Re-read target isotopes</button>' : '') +
-    '<input type="file" id="alibInput" webkitdirectory directory multiple hidden></div>' +
+    '<input type="file" id="alibInput" webkitdirectory directory multiple hidden><input type="file" id="alibInputF" accept=".dat,.endf,.tendl,.txt" multiple hidden></div>' +
     info +
     '<label class="chk" style="margin-top:6px"><input type="checkbox" id="alibUse"' +
     (ALIB.useXs ? ' checked' : '') +
@@ -381,6 +401,7 @@ function renderAlpha() {
 document.addEventListener('click', ev => {
   const id = ev.target.id;
   if (id === 'alibChoose') alibChoose();
+  else if (id === 'alibChooseF') document.getElementById('alibInputF').click();
   else if (id === 'alibRestore')
     alibRestore(true).then(ok => {
       renderAlpha();
@@ -389,7 +410,7 @@ document.addEventListener('click', ev => {
   else if (id === 'alibReload') alibAfterIndex();
 });
 document.addEventListener('change', ev => {
-  if (ev.target.id === 'alibInput') alibFromInput(ev.target.files);
+  if (ev.target.id === 'alibInput' || ev.target.id === 'alibInputF') alibFromInput(ev.target.files);
   else if (ev.target.id === 'alibUse') {
     ALIB.useXs = ev.target.checked;
   }

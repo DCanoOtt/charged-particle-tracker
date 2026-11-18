@@ -122,6 +122,9 @@ with sync_playwright() as p:
     check('production cross sections: a curve can be removed', xr == 1, xr)
     pg.click('#cXs > h2[data-fold]'); xf = pg.evaluate("document.querySelector('#cXs').classList.contains('collapsed')"); pg.click('#cXs > h2[data-fold]')
     check('production-xs card collapses and expands', xf is True)
+    xn = pg.evaluate("""()=>{const P=['n','neutrons','p','d','t','h','a','α','g','γ','photons'].map(s=>{const q=xsParse(s); return q&&q.sp}); const he3=xsParse('He-3'); const it={ZA:0,st:-1,sp:'n',lay:'all'}; const c=xsCurve(it,16); const rows=xsRows('all').rows; let k=0; while(c.x[k]<10) k++; const E=c.x[k]; let man=0; for(const row of rows){let s=0; for(const mt of row.d.order){const ch=row.d.channels[mt]; if(ch.primary) s+=chSigma(ch,E)*chYield(ch,'n',E);} man+=row.w*s*1000;} return {P, he3:[he3.ZA, he3.sp], v:c.y[k], man, n:rows.length}}""")
+    check('emitted particles (n, p, d, t, h, a, g) are accepted as products; He-3 stays the residual nucleus', xn['P'] == ['n', 'n', 'p', 'd', 't', 'h', 'a', 'a', 'g', 'g', 'g'] and xn['he3'][0] == 2003 and xn['he3'][1] is None, xn)
+    check('neutron production = sum over the primary channels of σ × neutron multiplicity', xn['n'] > 0 and xn['v'] > 0 and abs(xn['v'] / xn['man'] - 1) < 1e-9, xn)
     sb = pg.evaluate("""()=>{sbRender(); const el=document.getElementById('sBar'); const r=el.getBoundingClientRect(); return {t:el.innerText, order: !!(document.querySelector('header.top').compareDocumentPosition(el) & 4) && !!(el.compareDocumentPosition(document.querySelector('.app')) & 4)}}""")
     check('status bar between the title and the beam/layers panels shows stopping powers, reaction library, decay data, simulation and the version', all(k in sb['t'] for k in ['Stopping powers', 'Reaction library', 'Decay data', 'Simulation', 'v' + pg.evaluate('APP_VERSION')]) and sb['order'], sb)
     sb2 = pg.evaluate("""()=>{const s=irrSet(), old=[s.src, DEC.nuc, DEC.name]; s.src='file'; DEC.nuc=0; sbRender(); const a=document.getElementById('sBar').innerText; DEC.nuc=1234; DEC.name='JEFFtest'; sbRender(); const b=document.getElementById('sBar').innerText; const dots=[...document.querySelectorAll('#sBar .sbc.ok')].length; s.src=old[0]; DEC.nuc=old[1]; DEC.name=old[2]; sbRender(); return [a.includes('not loaded'), b.includes('JEFFtest') && b.includes('1,234'), dots]}""")
@@ -201,6 +204,39 @@ with sync_playwright() as p:
     w = pg.evaluate("(()=>{S.tab='depth';renderPlots(true);const e=document.getElementById('expRes');return [e.clientWidth,e.scrollWidth]})()")
     check('PNG width select wide enough for its text', w[0] >= 96, w)
 
+    # --- JENDL-5 style file (d_003-Li-006.dat) chosen with the file button: indexed by name, MF3/MT5 + MF6 yields (LAW 7 products, H-4 residual) read ---
+    pg.reload(); pg.wait_for_timeout(1200)
+    pg.evaluate("()=>{S.beam.pid='d'; const q=curPart(); S.beam.Z=q.Z; S.beam.A=q.A; S.tab='endf'; renderAlpha()}")
+    check('"Choose file(s)" button next to the folder button', pg.evaluate("!!document.getElementById('alibChooseF') && !!document.getElementById('alibInputF')"))
+    pg.set_input_files('#alibInputF', os.path.join(ROOT, 'tests/data/d_003-Li-006.dat')); pg.wait_for_timeout(1000)
+    jx = pg.evaluate("""async()=>{const ok=await alibLoadIso(3,6); const d=ALIB.data.get('d:3-6'); const c=d&&d.channels&&d.channels[5]; sbRender();
+      return {cnt:ALIB.counts, key:[...(ALIB.idx.get('d')||new Map()).keys()], mt:c&&Object.keys(c.y), nres:c&&c.res.length, sb:document.getElementById('sBar').innerText}}""")
+    check('JENDL-5 file name d_003-Li-006.dat is indexed as the deuteron file of Li-6', jx['cnt'].get('d') == 1 and jx['key'] == ['3-6'], jx)
+    check('JENDL-5 file read: MT5 with the yields of n, p, α and the residual nuclei', jx['mt'] and 'n' in jx['mt'] and 'a' in jx['mt'] and jx['nres'] == 2, jx)
+    check('status bar shows the file loaded as the deuteron library', 'd_003-Li-006.dat' in jx['sb'] and '1 files' in jx['sb'], jx['sb'])
+    # LAW 7 products (n, p, α of the JENDL-5 style file) give secondary spectra: yield = integral of the spectrum, sphere integral = spectrum, nothing "unsupported"
+    pg.evaluate("""()=>{const m=presetDef('Lithium fluoride (LiF)'); S.layers=[{id:uid(),t:2,tu:'mm',def:m}]; S.beam.E=3; S.tab='endf'; renderAll()}""")
+    pg.evaluate('alibEnsure()'); pg.wait_for_timeout(1500); run(pg, 3000)
+    l7 = pg.evaluate("""(()=>{pset('endf').chs=['sum']; const F=alibFold(RES), out={};
+      for (const sp of ['n','p','a']) { const sel=['sum'], Eo=secBound(F,0,sp,sel); if(!(Eo>0)){out[sp]=null;continue}
+        const angs=[]; for(let i=0;i<90;i++) angs.push(180*(i+0.5)/90);
+        const r=secCompute(F,0,sp,sel,120,Eo,angs), dE=Eo/120; let t=0; for(const v of r.tot) t+=v*dE;
+        let a=0; for(let i=0;i<90;i++){let s=0; for(const v of r.ang[i]) s+=v*dE; a+=s*2*Math.PI*Math.sin(angs[i]*Math.PI/180)*Math.PI/90}
+        out[sp]={W:r.W, tot:t, ang:a, un:r.nUnsup, kind:secKinds(F,0,sp,sel)}} return out})()""")
+    for k, v in l7.items():
+        check('LAW 7 secondary %s: spectrum integral = reactions x yield (3 %%), sphere integral = spectrum (6 %%), data used' % k,
+              v is not None and v['W'] > 0 and abs(v['tot'] / v['W'] - 1) < 0.03 and abs(v['ang'] / v['tot'] - 1) < 0.06 and v['un'] == 0 and 'LAW 7' in v['kind'], v)
+    # alpha file with the neutron production MT201 (a_013-Al-027.dat): merged into MT5, neutron spectrum available
+    pg.set_input_files('#alibInputF', os.path.join(ROOT, 'tests/data/a_013-Al-027.dat')); pg.wait_for_timeout(1000)
+    pg.evaluate("""()=>{const m=presetDef('Aluminium'); S.layers=[{id:uid(),t:2,tu:'mm',def:m}]; S.beam.pid='a'; const q=curPart(); S.beam.Z=q.Z; S.beam.A=q.A; S.beam.E=10; S.tab='endf'; renderAll()}""")
+    pg.evaluate('alibEnsure()'); pg.wait_for_timeout(1500); run(pg, 3000)
+    an = pg.evaluate("""(()=>{pset('endf').chs=['sum']; const F=alibFold(RES), tot=alibTotal(F,F.rows[0]), sel=['sum'], Eo=secBound(F,0,'n',sel);
+      const r=secCompute(F,0,'n',sel,120,Eo,null), dE=Eo/120; let t=0; for(const v of r.tot) t+=v*dE; return {P:tot.P, Yn:tot.Y.n, W:r.W, tot:t, un:r.nUnsup, xs:xsCurve({ZA:0,st:-1,sp:'n',lay:'all'},10).y.slice(-1)[0]}})()""")
+    check('MT201 neutron production (α file) gives neutron yield, spectrum and production cross section (0.27 b at 10 MeV)', an['Yn'] > 0 and abs(an['tot'] / an['W'] - 1) < 0.03 and an['un'] == 0 and abs(an['xs'] - 270) < 1, an)
+    pg.set_input_files('#alibInputF', os.path.join(ROOT, 'tests/data/d-003_Li_006.endf')); pg.wait_for_timeout(1000)
+    ex = pg.evaluate("""async()=>{alibTargetIsotopes=()=>[{Z:3,A:6,sym:'Li'}]; S.beam.pid='d'; const q=curPart(); S.beam.Z=q.Z; S.beam.A=q.A; S.beam.E=8; const d=await alibLoadIso(3,6); const r=await alibEnsure(); renderAlpha(); return {cnt:ALIB.counts, key:[...(ALIB.idx.get('d')||new Map()).keys()], order:d&&d.order, ok:r&&r.ok, html:document.getElementById('gAlpha')?document.getElementById('gAlpha').innerText:document.body.innerText}}""")
+    check('ENDF/B-VIII.0 file name d-003_Li_006.endf is indexed and read (MT 2, 50, 600, 800)', ex['cnt'].get('d') == 1 and ex['key'] == ['3-6'] and ex['order'] == [2, 50, 600, 800], ex)
+    check('warning when the beam energy is above the energy range of the evaluation', 'above the energy range of the evaluation' in ex['html'] and 'Li-6 up to 5 MeV' in ex['html'], ex['html'][-400:])
     # --- TENDL2025 tree with the five libraries (p, d, t, h, a): the library of the projectile selected is used ---
     tree = tempfile.mkdtemp(); top = os.path.join(tree, 'TENDL2025')
     for L in 'apdth':
@@ -486,7 +522,7 @@ with sync_playwright() as p:
     check('background preview: zoom enables Reset zoom, which clears it', bz == [False, True], bz)
     sj = pg.evaluate("(()=>{const o=JSON.parse(setupJSON()); return [o.codeVersion, o.layerSummary[0]]})()")
     fn = pg.evaluate("setupFileName()")
-    check('setup file name = symbols + thickness + unit + phase per layer, then the code version', fn.endswith('_v0.1.6.setup.json') and '-g_' in fn, fn)
+    check('setup file name = symbols + thickness + unit + phase per layer, then the code version', fn.endswith('_v0.2.1.setup.json') and '-g_' in fn, fn)
     check('setup file lists symbols, thickness, unit, phase (s/l/g) per layer and the code version', sj[0] and sj[1]['symbols'] and sj[1]['thickness'] > 0 and sj[1]['unit'] and sj[1]['phase'] in ('s', 'l', 'g'), sj)
     ex = pg.evaluate("[measCsv(',').split('\\n').filter(l=>l && l[0]!=='#').length, measRootHists().length, measRootHists()[0].name, measCsv(',').indexOf('sigma_syst')>0]")
     check('CSV rows and ROOT histograms per isotope-γ combination', ex[0] == 1 + MEAS.res_n if False else ex[0] > 24 and ex[1] % 8 == 0 and ex[1] > 0 and ex[3], ex)

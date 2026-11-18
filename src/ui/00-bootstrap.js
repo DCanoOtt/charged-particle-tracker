@@ -5,7 +5,7 @@ const PT = new Function(ENGINE_SRC + '\n;return PT;')();
 const $ = (s, r) => (r || document).querySelector(s),
   $$ = (s, r) => [...(r || document).querySelectorAll(s)];
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
-const APP_VERSION = '0.2.1'; // code version, written into saved setup files
+const APP_VERSION = '0.2.2'; // code version, written into saved setup files
 let _uid = 1;
 const uid = () => 'i' + _uid++;
 const clone = o => JSON.parse(JSON.stringify(o));

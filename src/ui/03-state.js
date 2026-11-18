@@ -40,6 +40,7 @@ function defaultState() {
     sim: { N: 2000, seed: 12345, dispTracks: 40, depthBins: 400, depthMax: '', trackCapM: 3 },
     plots: {},
     irr: {},
+    neu: {},
     tab: 'depth',
     sel: 0
   };
@@ -78,7 +79,7 @@ function saveLocal() {
   try {
     localStorage.setItem(
       'chargedtracker.v1',
-      JSON.stringify({ S: { layers: S.layers, beam: S.beam, phys: S.phys, sim: S.sim, plots: S.plots, irr: S.irr, tab: S.tab }, USERLIB })
+      JSON.stringify({ S: { layers: S.layers, beam: S.beam, phys: S.phys, sim: S.sim, plots: S.plots, irr: S.irr, neu: S.neu, tab: S.tab }, USERLIB })
     );
   } catch (e) {}
 }
@@ -105,6 +106,7 @@ function applyState(o) {
   S.sim = Object.assign(d.sim, o.sim || {});
   S.plots = o.plots || {};
   S.irr = o.irr || {};
+  S.neu = o.neu || {};
   S.tab = o.tab === 'espec' ? 'flux' : o.tab || 'depth';
   S.sel = 0;
 }

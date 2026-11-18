@@ -1178,6 +1178,7 @@ document.addEventListener('click', ev => {
 function renderPlots(full) {
   try {
     if (typeof actRender === 'function') actRender();
+    if (typeof neuRender === 'function') neuRender();
     if (typeof xsRender === 'function') xsRender();
   } catch (e) {
     console.error(e);

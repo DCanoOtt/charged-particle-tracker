@@ -46,29 +46,33 @@ function tab1Eval(t, x) {
     if (X[m] > x) hi = m;
     else lo = m;
   }
+  const law = intLaw(t.nbt, t.int, hi);
+  return intrp(law, x, X[lo], X[hi], Y[lo], Y[hi]);
+}
+// ENDF-6 interpolation code of the region that contains the 0-based upper point `hi` (NBT are 1-based point numbers; default 2 = lin-lin)
+function intLaw(nbt, int, hi) {
   let law = 2;
-  for (let r = 0; r < t.nbt.length; r++) {
-    if (hi + 1 <= t.nbt[r]) {
-      law = t.int[r];
-      break;
-    }
-    law = t.int[r];
+  for (let r = 0; r < nbt.length; r++) {
+    if (hi + 1 <= nbt[r]) return int[r];
+    law = int[r];
   }
-  const x0 = X[lo],
-    x1 = X[hi],
-    y0 = Y[lo],
-    y1 = Y[hi];
+  return law;
+}
+// y(x) between (x0, y0) and (x1, y1) with the ENDF-6 interpolation code: 1 histogram, 2 lin-lin, 3 lin-log, 4 log-lin, 5 log-log
+function intrp(law, x, x0, x1, y0, y1) {
   if (x1 === x0) return y1;
   const f = (x - x0) / (x1 - x0);
   switch (law) {
     case 1:
       return y0;
     case 3:
-      return y0 + (y1 - y0) * (Math.log(x / x0) / Math.log(x1 / x0));
+      return x0 > 0 && x1 > 0 && x > 0 ? y0 + (y1 - y0) * (Math.log(x / x0) / Math.log(x1 / x0)) : y0 + (y1 - y0) * f;
     case 4:
       return y0 > 0 && y1 > 0 ? Math.exp(Math.log(y0) + (Math.log(y1) - Math.log(y0)) * f) : y0 + (y1 - y0) * f;
     case 5:
-      return y0 > 0 && y1 > 0 && x0 > 0 ? Math.exp(Math.log(y0) + (Math.log(y1) - Math.log(y0)) * (Math.log(x / x0) / Math.log(x1 / x0))) : y0 + (y1 - y0) * f;
+      return y0 > 0 && y1 > 0 && x0 > 0 && x1 > 0 && x > 0
+        ? Math.exp(Math.log(y0) + (Math.log(y1) - Math.log(y0)) * (Math.log(x / x0) / Math.log(x1 / x0)))
+        : y0 + (y1 - y0) * f;
     default:
       return y0 + (y1 - y0) * f;
   }
@@ -135,6 +139,20 @@ class EndfCursor {
     this.i += n;
     return c;
   }
+  tab2() {
+    // TAB2 record: CONT + interpolation pairs (the data follow as separate records)
+    const c = this.cont(),
+      NR = c[4] | 0,
+      v = [];
+    for (let k = 0, n = Math.ceil((NR * 2) / 6); k < n; k++) for (const x of this.cont()) v.push(x);
+    const nbt = [],
+      int = [];
+    for (let r = 0; r < NR; r++) {
+      nbt.push(v[2 * r] | 0);
+      int.push(v[2 * r + 1] | 0);
+    }
+    return { c, nbt, int };
+  }
   skipTab2() {
     const c = this.cont(),
       NR = c[4] | 0;
@@ -187,12 +205,14 @@ function readLaw1(cur) {
 }
 // LAW 7 (laboratory angle-energy, JENDL-5): for every incident energy a set of μ values, each with a TAB1 f(E') (E' in MeV, f per MeV and per unit μ; ∫∫ f dE' dμ = 1)
 function readLaw7(cur) {
-  const t2 = cur.skipTab2(),
+  const T2 = cur.tab2(),
+    t2 = T2.c,
     NE = t2[5] | 0,
     E = new Float64Array(NE),
     L = [];
   for (let e = 0; e < NE; e++) {
-    const t3 = cur.skipTab2(),
+    const T3 = cur.tab2(),
+      t3 = T3.c,
       NM = t3[5] | 0,
       mu = new Float64Array(NM),
       T = [];
@@ -208,9 +228,9 @@ function readLaw7(cur) {
       mu[m] = t.c[1];
       T.push({ x, y, nbt: t.nbt, int: t.int });
     }
-    L.push({ mu, T });
+    L.push({ mu, T, nbt: T3.nbt, int: T3.int });
   }
-  return { law: 7, E, L, frame: 'lab' };
+  return { law: 7, E, L, nbt: T2.nbt, int: T2.int, frame: 'lab' };
 }
 // LAW 2 (two-body discrete): angular distribution per incident energy; LANG 0 Legendre a_1..a_NL, LANG 12/14 tabulated (mu, f)
 function readLaw2(cur) {

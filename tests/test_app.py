@@ -226,6 +226,20 @@ with sync_playwright() as p:
     for k, v in l7.items():
         check('LAW 7 secondary %s: spectrum integral = reactions x yield (3 %%), sphere integral = spectrum (6 %%), data used' % k,
               v is not None and v['W'] > 0 and abs(v['tot'] / v['W'] - 1) < 0.03 and abs(v['ang'] / v['tot'] - 1) < 0.06 and v['un'] == 0 and 'LAW 7' in v['kind'], v)
+    # neutron counting card: rate / total / per charge at the ENDF angles and at any angle, angular distribution in cos θ
+    pg.evaluate("()=>{S.neu={}; neuRender()}"); pg.wait_for_timeout(1500)
+    nc = pg.evaluate("""()=>({vis:!$('#cNeu').hidden, h:$('#cNeu h2').textContent, rows:$$('#neuRes table.t tr').length, nodes:NEU.res&&NEU.res.L7.nodes.length, angs:NEU.res&&NEU.res.angs,
+      rate:NEU.res&&NEU.res.sc.rate, svgs:[!!$('#neuC_n svg'),!!$('#neuC_v svg')], msg:$('#neuMsg').textContent})""")
+    check('neutron card is shown below the activation card, with the ENDF angles of the LAW 7 neutron table (0° and 180°)', nc['vis'] and nc['h'] == 'Neutron counting' and nc['nodes'] == 2 and nc['angs'] == [0, 180] and nc['svgs'] == [True, True], nc)
+    check('neutron rate scale: 1 nA of deuterons = 6.24e9 ions/s', abs(nc['rate'] / (1e-9 / 1.602176634e-19) - 1) < 1e-9, nc['rate'])
+    pg.fill('#neuCust', '90'); pg.click('#neuAddC'); pg.wait_for_function('NEU.res&&NEU.res.angs.length===3&&NEU.res.angs.includes(90)', timeout=20000); pg.wait_for_timeout(300)
+    nd = pg.evaluate("""()=>{const r=NEU.res, i=r.angs.indexOf(90), y=r.ysr(r.cs.ang[i]); return {angs:r.angs, iso:y*4*Math.PI/r.tot4, chk:r.i4/r.tot4, row:$$('#neuRes table.t tr').map(t=>t.textContent).filter(t=>t.startsWith('90'))[0]||'', chips:$$('#neuChips .chip').length}}""")
+    check('any angle (90°) is added and interpolated; the isotropic test data give 4π·Y(90°) = total and ∫Y dΩ = total', nd['angs'] == [0, 90, 180] and abs(nd['iso'] - 1) < 0.03 and abs(nd['chk'] - 1) < 0.06 and 'interpolated' in nd['row'] and nd['chips'] == 3, nd)
+    for q, u in [('tot', 'n sr⁻¹ MeV⁻¹'), ('perq', 'n sr⁻¹ µC⁻¹ MeV⁻¹'), ('rate', 'n s⁻¹ sr⁻¹ MeV⁻¹')]:
+        pg.select_option('#cNeu [data-nk=qty]', q); pg.wait_for_timeout(800)
+        yl = pg.evaluate("()=>NEU.data.n.ylabel+' | '+NEU.data.v.ylabel")
+        check('neutron plot quantity %s: axis label carries the unit' % q, u in yl.split(' | ')[0] and yl.split(' | ')[1].endswith(')') and u.replace(' MeV⁻¹', '') in yl.split(' | ')[1], yl)
+    pg.evaluate("()=>{delete S.neu.ang; neuUpdate()}"); pg.wait_for_timeout(800)
     # alpha file with the neutron production MT201 (a_013-Al-027.dat): merged into MT5, neutron spectrum available
     pg.set_input_files('#alibInputF', os.path.join(ROOT, 'tests/data/a_013-Al-027.dat')); pg.wait_for_timeout(1000)
     pg.evaluate("""()=>{const m=presetDef('Aluminium'); S.layers=[{id:uid(),t:2,tu:'mm',def:m}]; S.beam.pid='a'; const q=curPart(); S.beam.Z=q.Z; S.beam.A=q.A; S.beam.E=10; S.tab='endf'; renderAll()}""")
@@ -522,7 +536,7 @@ with sync_playwright() as p:
     check('background preview: zoom enables Reset zoom, which clears it', bz == [False, True], bz)
     sj = pg.evaluate("(()=>{const o=JSON.parse(setupJSON()); return [o.codeVersion, o.layerSummary[0]]})()")
     fn = pg.evaluate("setupFileName()")
-    check('setup file name = symbols + thickness + unit + phase per layer, then the code version', fn.endswith('_v0.2.1.setup.json') and '-g_' in fn, fn)
+    check('setup file name = symbols + thickness + unit + phase per layer, then the code version', fn.endswith('_v0.2.2.setup.json') and '-g_' in fn, fn)
     check('setup file lists symbols, thickness, unit, phase (s/l/g) per layer and the code version', sj[0] and sj[1]['symbols'] and sj[1]['thickness'] > 0 and sj[1]['unit'] and sj[1]['phase'] in ('s', 'l', 'g'), sj)
     ex = pg.evaluate("[measCsv(',').split('\\n').filter(l=>l && l[0]!=='#').length, measRootHists().length, measRootHists()[0].name, measCsv(',').indexOf('sigma_syst')>0]")
     check('CSV rows and ROOT histograms per isotope-γ combination', ex[0] == 1 + MEAS.res_n if False else ex[0] > 24 and ex[1] % 8 == 0 and ex[1] > 0 and ex[3], ex)

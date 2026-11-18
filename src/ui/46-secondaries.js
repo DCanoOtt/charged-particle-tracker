@@ -67,25 +67,27 @@ function d1Eval(d, Ein, Ep, mu, ac) {
 function d7Br(d, Ein) {
   const E = d.E,
     n = E.length;
-  if (Ein <= E[0]) return [0, 0, 0];
-  if (Ein >= E[n - 1]) return [n - 1, n - 1, 0];
+  if (Ein <= E[0]) return [0, 0, 0, 2];
+  if (Ein >= E[n - 1]) return [n - 1, n - 1, 0, 2];
   const lo = secLoc(E, Ein);
-  return [lo, lo + 1, (Ein - E[lo]) / (E[lo + 1] - E[lo])];
+  return [lo, lo + 1, (Ein - E[lo]) / (E[lo + 1] - E[lo]), intLaw(d.nbt || [], d.int || [], lo + 1)];
 }
+// interpolation in mu between the tables of one incident energy, with the interpolation law of the file (TAB2 of the mu grid)
 function d7At(Lk, mu, Ep) {
   const m = Lk.mu,
     n = m.length;
   if (n === 1 || mu <= m[0]) return tab1Eval(Lk.T[0], Ep);
   if (mu >= m[n - 1]) return tab1Eval(Lk.T[n - 1], Ep);
-  const lo = secLoc(m, mu),
-    t = (mu - m[lo]) / (m[lo + 1] - m[lo]);
-  return (1 - t) * tab1Eval(Lk.T[lo], Ep) + t * tab1Eval(Lk.T[lo + 1], Ep);
+  const lo = secLoc(m, mu);
+  return intrp(intLaw(Lk.nbt || [], Lk.int || [], lo + 1), mu, m[lo], m[lo + 1], tab1Eval(Lk.T[lo], Ep), tab1Eval(Lk.T[lo + 1], Ep));
 }
+// interpolation in the incident energy between two tables, with the interpolation law of the file (TAB2 of the energy grid)
 function d7Eval(d, Ein, mu, Ep) {
-  const [a, b, t] = d7Br(d, Ein),
+  const [a, b, t, law] = d7Br(d, Ein),
     f = d7At(d.L[a], mu, Ep);
-  return t > 0 ? (1 - t) * f + t * d7At(d.L[b], mu, Ep) : f;
+  return t > 0 ? intrp(law, Ein, d.E[a], d.E[b], f, d7At(d.L[b], mu, Ep)) : f;
 }
+// integral over mu: the trapezoids of the tabulated (linear) pieces, exact for the interpolation law 2 and a good approximation for the others
 function d7Int(Lk, Ep) {
   let s = 0;
   const m = Lk.mu;
@@ -99,9 +101,9 @@ function d7Int(Lk, Ep) {
   return s;
 }
 function d7Tot(d, Ein, Ep) {
-  const [a, b, t] = d7Br(d, Ein),
+  const [a, b, t, law] = d7Br(d, Ein),
     f = d7Int(d.L[a], Ep);
-  return t > 0 ? (1 - t) * f + t * d7Int(d.L[b], Ep) : f;
+  return t > 0 ? intrp(law, Ein, d.E[a], d.E[b], f, d7Int(d.L[b], Ep)) : f;
 }
 // MF6 LAW 2: normalised angular pdf f(mu)
 function d2List(L, mu) {

@@ -286,6 +286,7 @@ async function alibEnsure() {
   ALIB.report = { ok, miss, pj: PJ().letter };
   alibStatus();
   renderAlpha();
+  if (typeof neuRender === 'function') neuRender();
   if (typeof xsRender === 'function') xsRender();
   setTimeout(alibSync, 0);
   return ALIB.report;
@@ -315,6 +316,7 @@ function alibAfterIndex() {
     if (typeof drawChart === 'function') {
       if (S.tab === 'endf') renderPlots(true);
       else actRender();
+      if (typeof neuRender === 'function') neuRender();
       if (typeof xsRender === 'function') xsRender();
     }
   });

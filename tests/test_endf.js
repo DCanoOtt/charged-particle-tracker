@@ -34,6 +34,14 @@ const dn = j5.prods[0].dist; assert.ok(dn && dn.law === 7 && dn.frame === 'lab' 
 let I7 = 0, I7a = 0; const E7 = 1, top = 1.05, N7 = 4000;
 for (let i = 0; i < N7; i++) { const e = (i + 0.5) * top / N7; I7 += API7.d7Tot(dn, E7, e) * top / N7; I7a += API7.d7Eval(dn, E7, 0.3, e) * top / N7 }
 assert.ok(Math.abs(I7 - 1) < 2e-3, 'energy distribution integrates to 1: ' + I7); assert.ok(Math.abs(I7a - 0.5) < 2e-3, 'f(E\', mu) integrates to 1/2 per unit mu: ' + I7a);
+// interpolation laws of the LAW 7 TAB2 records are read and used (incident energy and cos θ)
+assert.ok(Array.isArray(dn.nbt) && dn.int.length >= 1 && dn.L[0].int.length >= 1 && dn.L[0].nbt.length >= 1, 'LAW 7: NBT/INT of both TAB2 records are stored');
+const mk7 = (ie, im) => ({ law: 7, E: Float64Array.of(1, 2), nbt: [2], int: [ie], L: [[1, 4], [4, 16]].map(v => ({ mu: Float64Array.of(-1, 1), nbt: [2], int: [im],
+  T: v.map(y => ({ x: Float64Array.of(0, 10), y: Float64Array.of(y, y), nbt: [2], int: [2] })) })) });
+const ev7 = (ie, im, E, mu) => API7.d7Eval(mk7(ie, im), E, mu, 5);
+assert.ok(Math.abs(ev7(2, 2, 1, 0) - 2.5) < 1e-12 && Math.abs(ev7(2, 4, 1, 0) - 2) < 1e-12 && Math.abs(ev7(2, 4, 2, 0) - 8) < 1e-12, 'cos θ interpolation: lin-lin and log-lin');
+assert.ok(Math.abs(ev7(2, 4, 1.5, 0) - 5) < 1e-12 && Math.abs(ev7(4, 4, 1.5, 0) - 4) < 1e-12, 'incident-energy interpolation: lin-lin 5, log-lin 4');
+assert.ok(Math.abs(ev7(5, 4, 1.5, 0) - 4.5) < 1e-9 && Math.abs(ev7(1, 4, 1.5, 0) - 2) < 1e-12, 'incident-energy interpolation: log-log 4.5, histogram 2');
 // JENDL-5 alpha file: neutron production MT201 (MF3 σ, MF6 yield 1, LAW 7) is merged into MT5 as the multiplicity σ201/σ5 (MT5 itself has no neutrons)
 const ra = parseEndfAlpha(fs.readFileSync(path.join(__dirname, 'data/a_013-Al-027.dat'), 'utf8'), PROJ.a);
 assert.deepStrictEqual(ra.order, [2, 5, 201]); const a5 = ra.channels[5];

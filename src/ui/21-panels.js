@@ -157,6 +157,7 @@ function setupJSON() {
       phys: S.phys,
       sim: S.sim,
       irr: S.irr,
+      neu: S.neu,
       userMaterials: USERLIB
     },
     null,

@@ -5,7 +5,7 @@ const ND_DEF = {
   T: 10,
   th: 100,
   N: 20000,
-  Emax: 40,
+  Emax: 200,
   rho: 0.874,
   hc: 1.212,
   lpo: {},
@@ -33,6 +33,7 @@ function ndSet() {
   const s = neuSet(),
     o = s.det && typeof s.det === 'object' ? s.det : (s.det = {});
   for (const k of Object.keys(ND_DEF)) if (o[k] === undefined) o[k] = ND_DEF[k];
+  if (o.Emax === 40) o.Emax = 200; // former default
   if (!ND_MAT[o.mat]) {
     o.mat = 'BC501A';
     o.rho = ND_MAT.BC501A.rho;
@@ -118,7 +119,7 @@ function ndInputs() {
     fld('Time resolution, FWHM (ns)', nI('data-dkn', 'dt', s.dt, 'min="0"')) +
     fld('Histories per energy', nI('data-dk', 'N', d.N, 'min="1000" step="1000"')) +
     '</div><div class="row3">' +
-    fld('Largest neutron energy of the efficiency curve (MeV)', nI('data-dk', 'Emax', d.Emax, 'min="1" max="60"')) +
+    fld('Largest neutron energy of the efficiency curve (MeV)', nI('data-dk', 'Emax', d.Emax, 'min="1" max="250"')) +
     '</div>' +
     '<details class="cw"><summary>Light-output curves (NRESP type, editable)</summary><p class="hint">Protons: L<sub>p</sub>(E) = a1·E − a2·[1 − exp(−a3·E<sup>a4</sup>)] (MeVee; Cecil et al. for the NE-213 type liquids, Madey / Verbinski for the plastic). Alphas: L<sub>α</sub> = kα·E<sup>kb</sup>. Carbon recoils: L<sub>C</sub> = c·E<sup>cb</sup>. Electrons are linear (1 MeVee = 1 MeV of electron energy).</p><div class="row3">' +
     [
@@ -147,7 +148,7 @@ function ndDataStatus() {
     esc(D.nC) +
     '</b> (n+¹²C, ' +
     ndChannelsC(D.C).length +
-    ' reaction channels up to 40 MeV), ACE files of the ENDF/B-VIII.0 library (lib80x) at room temperature, 293.6 K.'
+    ' reaction channels, lumped above 20 MeV), ACE files of the ENDF/B-VIII.0 library (lib80x) at room temperature, 293.6 K.'
   );
 }
 function ndBuild() {
@@ -174,7 +175,7 @@ function ndOpen() {
 
 // ---- running ----
 const ndKey = () => JSON.stringify([ndDet(), neuSet().dt, ndSet().N, ndSet().Emax, ND.data.nH, ND.data.nC, (ND.data.H || {}).nMt, (ND.data.C || {}).nMt]);
-const ndEnergies = Emax => Array.from({ length: 60 }, (_, i) => 0.1 * Math.pow(Math.max(Emax, 0.2) / 0.1, i / 59));
+const ndEnergies = Emax => Array.from({ length: 80 }, (_, i) => 0.1 * Math.pow(Math.max(Emax, 0.2) / 0.1, i / 79));
 async function ndCalc() {
   const my = ++ND.gen,
     msg = $('#ndMsg'),
@@ -184,7 +185,7 @@ async function ndCalc() {
   await new Promise(r => setTimeout(r, 20));
   const det = ndDet(),
     S = ndSetup(det, ND.data),
-    E = ndEnergies(+d.Emax || 40),
+    E = ndEnergies(+d.Emax || 200),
     eps = [],
     err = [],
     e1 = [];
@@ -204,6 +205,21 @@ async function ndCalc() {
   if (msg) msg.textContent = '';
   ndShow();
   if (NEU.res) neuShow();
+}
+function ndErrAt(E) {
+  const f = ND.eff;
+  if (!f) return 0;
+  const x = f.E;
+  if (E <= x[0]) return f.err[0];
+  if (E >= x[x.length - 1]) return f.err[x.length - 1];
+  let lo = 0,
+    hi = x.length - 1;
+  while (hi - lo > 1) {
+    const m = (lo + hi) >> 1;
+    if (x[m] > E) hi = m;
+    else lo = m;
+  }
+  return f.err[lo] + ((f.err[hi] - f.err[lo]) * (E - x[lo])) / (x[hi] - x[lo]);
 }
 function ndEffAt(E) {
   const f = ND.eff;
@@ -329,7 +345,7 @@ function ndShow() {
       nb = 200,
       rec = { nE: r.nbo, Eo: r.Eo, nT: 240, Lm: Lp, st, dE, t0: ndTof((eLast + 1) * dE, Lp) - 4 * st, t1: ndTof(Math.max(0.2, eFirst * dE), Lp) + 4 * st },
       pr = ndPulse(f.S, Ec, cdf, 300000, nb, Lmax, 4242, rec);
-    ND.ph = { key, Lmax, nb, all: pr.all, sw: pr.sw, recE: pr.recE, recT: pr.recT, rec };
+    ND.ph = { key, Lmax, nb, all: pr.all, sw: pr.sw, recE: pr.recE, recT: pr.recT, rec, sw2: pr.sw2, sd: pr.sd, sd2: pr.sd2, nd: pr.nd, N: pr.N };
   }
   const P = ND.ph,
     dL = P.Lmax / P.nb,
@@ -339,6 +355,17 @@ function ndShow() {
     phThr = Float64Array.from(phy, (v, i) => ((i + 0.5) * dL > f.S.Lth ? v : 0));
   let nAbove = 0;
   phThr.forEach(v => (nAbove += v * dL));
+  // statistics of the detected neutrons: ratio estimator p = Σw_det / Σw of the Monte Carlo (weights = solid-angle weights of the entry points)
+  const pe = P.sw > 0 ? P.sd / P.sw : 0,
+    vp = P.sw > 0 ? Math.max(0, P.sd2 * (1 - 2 * pe) + pe * pe * P.sw2) / (P.sw * P.sw) : 0,
+    sp = Math.sqrt(vp),
+    nDet = ntot * pe,
+    sDet = ntot * sp,
+    expInt = (() => {
+      let t = 0;
+      for (let j = 0; j < r.nbo; j++) t += det[j] * dE;
+      return t;
+    })();
   const rc = P.rec,
     rtof = d.dist === 't',
     rE = new Float64Array(rc.nE + 1),
@@ -387,6 +414,55 @@ function ndShow() {
       '>Neutron energy</option><option value="t"' +
       (d.dist === 't' ? ' selected' : '') +
       '>Time of flight</option></select></label>';
+  const isTot = qk === 'tot',
+    uq = un[0];
+  html +=
+    '<h3 class="sub">Statistics of the detected neutrons (θ = ' +
+    fmt(r.angs[ia], 5) +
+    '°)</h3><div class="tscroll"><table class="t"><tbody>' +
+    '<tr><td>Neutrons reaching the front face</td><td>' +
+    fmt(ntot, 5) +
+    ' ' +
+    esc(uq.replace('counts', 'n')) +
+    '</td></tr>' +
+    '<tr><td><b>Detected neutrons (above ' +
+    d.th +
+    ' keVee)</b></td><td><b>' +
+    fmt(nDet, 5) +
+    ' ± ' +
+    fmt(sDet, 2) +
+    ' ' +
+    esc(uq) +
+    '</b> (' +
+    fmt((100 * sDet) / (nDet || 1), 2) +
+    ' %, Monte Carlo, 1σ)</td></tr>' +
+    '<tr><td>Mean efficiency for this spectrum</td><td>' +
+    fmt(pe, 4) +
+    ' ± ' +
+    fmt(sp, 2) +
+    '</td></tr>' +
+    '<tr><td>Monte Carlo</td><td>' +
+    P.nd +
+    ' detected events out of ' +
+    P.N +
+    ' histories (N_eff = ' +
+    fmt((P.sw * P.sw) / (P.sw2 || 1), 5) +
+    ')</td></tr>' +
+    '<tr><td>Same number from the efficiency curve (expected distribution)</td><td>' +
+    fmt(expInt, 5) +
+    ' ' +
+    esc(uq) +
+    '</td></tr>' +
+    (isTot
+      ? '<tr><td>Counting (Poisson) uncertainty of a real measurement</td><td>± ' +
+        fmt(Math.sqrt(Math.max(nDet, 0)), 3) +
+        ' counts (' +
+        fmt(100 / Math.sqrt(Math.max(nDet, 1)), 2) +
+        ' %)</td></tr>'
+      : '') +
+    '</tbody></table></div><p class="hint">The ± is the statistical error of the efficiency Monte Carlo (' +
+    P.N +
+    ' histories; it falls as 1/√N). The neutron spectrum of the card comes from a deterministic calculation and has no statistical error; its systematic uncertainty (cross sections, stopping power) and the efficiency model uncertainty are not included.</p>';
   html +=
     '<h3 class="sub">Detected neutrons: expected distribution</h3><div class="pcbar">' +
     angSel +

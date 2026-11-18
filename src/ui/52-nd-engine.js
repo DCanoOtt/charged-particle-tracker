@@ -51,6 +51,18 @@ function ndNpXs(E) {
     sS = 1 / (1 + cotS * cotS);
   return ((4 * Math.PI) / k2) * (0.75 * sT + 0.25 * sS) * 0.01;
 }
+// n-p total cross section above the end of the ACE table (20 MeV), barn: evaluated-data values (SAID / ENDF-type) at 20 ... 250 MeV, log-log interpolation
+const ND_NPH = { E: [20, 30, 50, 80, 100, 150, 200, 250], y: [0.482, 0.3, 0.17, 0.095, 0.073, 0.05, 0.041, 0.036] };
+function ndNpHigh(E) {
+  const x = ND_NPH.E,
+    y = ND_NPH.y;
+  if (E <= x[0]) return y[0];
+  if (E >= x[x.length - 1]) return y[y.length - 1];
+  let i = 0;
+  while (x[i + 1] < E) i++;
+  const f = Math.log(E / x[i]) / Math.log(x[i + 1] / x[i]);
+  return Math.exp(Math.log(y[i]) + f * Math.log(y[i + 1] / y[i]));
+}
 const ND_C = {
   E: [0.01, 0.1, 0.5, 1, 2, 3, 4, 5, 6, 8, 10, 12, 14, 16, 18, 20, 25, 30, 40, 60],
   el: [4.7, 4.7, 3.7, 2.6, 1.9, 1.75, 1.7, 1.6, 1.5, 1.3, 1.1, 0.95, 0.82, 0.78, 0.78, 0.77, 0.65, 0.55, 0.45, 0.35],
@@ -103,17 +115,17 @@ const ND_C = {
   ]
 };
 const ndTable = (x, y) => ({ x: Float64Array.from(x), y: Float64Array.from(y), nbt: [x.length], int: [2] });
-const ND_GRID = { l0: Math.log(0.005), dl: 0.004, n: Math.ceil(Math.log(60 / 0.005) / 0.004) + 1 };
+const ND_GRID = { l0: Math.log(0.005), dl: 0.004, n: Math.ceil(Math.log(250 / 0.005) / 0.004) + 1 };
 const ndGridE = i => Math.exp(ND_GRID.l0 + i * ND_GRID.dl);
 const ndPdfNp = (E, mu) => 1 + Math.max(0, 0.012 * (E - 10)) * mu * mu; // built-in: isotropic in the CM below 10 MeV, then forward-backward peaked
 const ndPdfC = (E, mu) => (E < 1 ? 1 : Math.exp(((1.8 * E) / (E + 4)) * mu));
 
 // angular sampler: CDF of the pdf f(E, mu) (CM cosine of the scattered neutron) on 120 energies x 65 cosines
 function ndAngTable(fn) {
-  const NE = 120,
+  const NE = 150,
     NM = 65,
     l0 = Math.log(0.005),
-    dl = Math.log(60 / 0.005) / (NE - 1),
+    dl = Math.log(250 / 0.005) / (NE - 1),
     cdf = new Float32Array(NE * NM);
   for (let i = 0; i < NE; i++) {
     const E = Math.exp(l0 + i * dl);
@@ -291,7 +303,7 @@ function ndParseAce(text) {
     Eg,
     Array.from({ length: NES }, (_, i) => X(esz + 3 * NES + i))
   );
-  const keep = mt => mt === 4 || mt === 22 || mt === 28 || (mt >= 51 && mt <= 91) || ND_ABS.has(mt) || ND_CHG[mt];
+  const keep = mt => mt === 4 || mt === 5 || mt === 22 || mt === 28 || (mt >= 51 && mt <= 91) || ND_ABS.has(mt) || ND_CHG[mt];
   for (let i = 0; i < NTR; i++) {
     const mt = X(mtr + i);
     if (!keep(mt)) continue;
@@ -382,6 +394,7 @@ function ndChannelsC(d) {
     add(k, '(n,n′) MT ' + k + ' (' + (-Q).toFixed(2) + ' MeV)', -Q > ND_3A + 0.05 ? 'brk' : 'inel', 'a', Q);
   }
   if (!lev.length && m[4]) add(4, '(n,n′) MT 4', 'inel', 'a', -4.439);
+  if (m[5]) add(5, '(n,x) MT 5 above 20 MeV (lumped nonelastic, Q ≈ −12 MeV)', 'brk', 'a', -12);
   if (m[22]) add(22, '(n,n′α) MT 22', 'brk', 'a', m[22].QM);
   if (m[28]) add(28, '(n,n′p) MT 28', 'brk', 'p', m[28].QM);
   for (const k of Object.keys(m).map(Number)) {
@@ -391,6 +404,12 @@ function ndChannelsC(d) {
   return out;
 }
 
+// n+1H angular distribution: tabulated up to the last energy of the file, above it the last distribution times (1 + b mu^2), b = 0.025 (E - E_last) up to 3
+// (forward and backward peaking of the n-p scattering in the CM at 50 - 200 MeV)
+function ndAngHi(a, E, mu) {
+  const El = a.E[a.E.length - 1];
+  return E <= El ? d2Eval(a, E, mu) : d2Eval(a, El, mu) * (1 + Math.min(3, 0.025 * (E - El)) * mu * mu);
+}
 // ---- medium: macroscopic cross sections on a fine log grid ----
 // data: { H: ndParseN() result | null, C: ndParseN() result | null }
 function ndMedium(rho, hc, data) {
@@ -409,9 +428,19 @@ function ndMedium(rho, hc, data) {
     cs = chans.map(() => new Float64Array(n));
   for (let i = 0; i < n; i++) {
     const E = ndGridE(i);
-    sH[i] = hTab ? tab1Eval(hTab, E) : ndNpXs(E);
-    sEl[i] = tab1Eval(elTab, E);
-    chans.forEach((c, k) => (cs[k][i] = Math.max(0, tab1Eval(c.xs, E))));
+    // the ACE tables end at 20 MeV: above, 1H follows an evaluated-data n-p cross section table (ND_NPH) normalised at the last point,
+    // 12C channels keep their last value
+    const xe = (t, e) => {
+      const m = t.x.length;
+      return e <= t.x[m - 1] ? tab1Eval(t, e) : t.y[m - 1];
+    };
+    sH[i] = hTab
+      ? E <= hTab.x[hTab.x.length - 1]
+        ? tab1Eval(hTab, E)
+        : (hTab.y[hTab.x.length - 1] * ndNpHigh(E)) / ndNpHigh(hTab.x[hTab.x.length - 1])
+      : ndNpXs(E);
+    sEl[i] = xe(elTab, E);
+    chans.forEach((c, k) => (cs[k][i] = Math.max(0, c.xs.x[c.xs.x.length - 1] < 19.9 ? tab1Eval(c.xs, E) : xe(c.xs, E))));
   }
   const tot = new Float64Array(n);
   for (let i = 0; i < n; i++) {
@@ -419,7 +448,7 @@ function ndMedium(rho, hc, data) {
     for (let k = 0; k < cs.length; k++) s += nC * cs[k][i];
     tot[i] = s;
   }
-  const angH = ndAngTable(H && H.ang && H.ang.lct !== 1 ? (E, mu) => d2Eval(H.ang, E, mu) : ndPdfNp),
+  const angH = ndAngTable(H && H.ang && H.ang.lct !== 1 ? (E, mu) => ndAngHi(H.ang, E, mu) : ndPdfNp),
     angC = ndAngTable(C && C.ang && C.ang.lct !== 1 ? (E, mu) => d2Eval(C.ang, E, mu) : ndPdfC);
   return { nH, nC, sH, sEl, cs, chans, tot, angH, angC, fromFile: { H: !!(H && hTab), C: !!(C && C.mts[2]), angH: !!(H && H.ang), angC: !!(C && C.ang) } };
 }
@@ -607,7 +636,11 @@ function ndPulse(S, Ecent, cdf, N, nb, Lmax, seed, rec) {
     r = rec || { nE: 1, Eo: 1, nT: 1, t0: 0, t1: 1, Lm: S.geo.Ld / 100, st: 0 },
     recE = new Float64Array(r.nE),
     recT = new Float64Array(r.nT);
-  let sw = 0;
+  let sw = 0,
+    sw2 = 0,
+    sd = 0,
+    sd2 = 0,
+    nd = 0;
   for (let h = 0; h < N; h++) {
     const u = rng();
     let lo = 0,
@@ -621,6 +654,12 @@ function ndPulse(S, Ecent, cdf, N, nb, Lmax, seed, rec) {
       En = r.dE > 0 ? Ecent[lo] + (rng() - 0.5) * r.dE : Ecent[lo], // energy uniform inside the bin of the histogram
       L = ndHistory(S.med, S.lp, S.geo, En, e.x, e.y, e.ux, e.uy, e.uz, rng);
     sw += e.w;
+    sw2 += e.w * e.w;
+    if (L > S.Lth) {
+      sd += e.w;
+      sd2 += e.w * e.w;
+      nd++;
+    }
     if (L > 0) {
       const b = Math.floor((L / Lmax) * nb);
       if (b >= 0 && b < nb) all[b] += e.w;
@@ -635,5 +674,5 @@ function ndPulse(S, Ecent, cdf, N, nb, Lmax, seed, rec) {
       if (be >= 0 && be < r.nE) recE[be] += e.w;
     }
   }
-  return { all, recE, recT, sw };
+  return { all, recE, recT, sw, sw2, sd, sd2, nd, N };
 }

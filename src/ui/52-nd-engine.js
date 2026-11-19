@@ -579,15 +579,18 @@ function ndHistory(med, lp, geo, E, x, y, ux, uy, uz, rng) {
 }
 // isotropic CM table shared by all inelastic channels
 const ND_ISO = ndAngTable(() => 1);
-// entry point on the front face and direction from the point source at distance Ld (cm); weight (Ld/r)^3 = solid-angle element relative to the axis
+// entry point on the front face and direction from the point source at distance Ld (cm); weight (Ld/r)^3 = solid-angle element relative to the axis.
+// The neutrons illuminate the disc of radius geo.rb (the neutron beam on the front face, rb <= R); without rb the whole face (radius R)
 function ndEntry(geo, rng) {
-  const r = geo.R * Math.sqrt(rng()),
+  const r = (geo.rb > 0 ? geo.rb : geo.R) * Math.sqrt(rng()),
     ph = 2 * Math.PI * rng(),
     x = r * Math.cos(ph),
     y = r * Math.sin(ph),
     d = Math.sqrt(x * x + y * y + geo.Ld * geo.Ld);
   return { x, y, ux: x / d, uy: y / d, uz: geo.Ld / d, w: Math.pow(geo.Ld / d, 3) };
 }
+// solid angle (sr) of a disc of radius R (the front face or the neutron beam on it) at distance Ld on the axis (same length unit)
+const ndOmega = (R, Ld) => 2 * Math.PI * (1 - Ld / Math.sqrt(Ld * Ld + R * R));
 // light-output resolution: FWHM/L = res / sqrt(L / 1 MeVee) (statistical, res = FWHM/L at 1 MeVee); Gaussian smearing of the total light of one history
 function ndSmear(L, res, rng) {
   if (!(res > 0) || !(L > 0)) return L;
@@ -668,7 +671,7 @@ function ndSetup(det, data) {
   const med = ndMedium(det.rho, det.hc, data);
   med.angIso = ND_ISO;
   const lp = Object.assign({}, ND_LP[(ND_MAT[det.mat] || ND_MAT.BC501A).curve], det.lp || {}),
-    geo = { R: det.D / 2, T: det.T, Ld: det.Lm * 100 };
+    geo = { R: det.D / 2, T: det.T, Ld: det.Lm * 100, rb: det.bd > 0 ? Math.min(det.bd, det.D) / 2 : det.D / 2 };
   return { med, lp, geo, Lth: det.th / 1000, res: det.res > 0 ? det.res / 100 : 0 };
 }
 // efficiency at one energy: { eps, err, eps1 }, eps1 = single-collision estimate for normal incidence on the axis

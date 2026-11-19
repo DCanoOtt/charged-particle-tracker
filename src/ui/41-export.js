@@ -289,9 +289,53 @@ function rootMacroOf() {
   c += '  f->Close();\n}\n';
   return c;
 }
+// "Save as" box: the file name (without the extension) can be edited before every save; resolves to the final name or null (cancelled).
+// Skipped in automated tests (navigator.webdriver) unless window.__askName === true; window.__askName === false switches it off.
+function askFileName(name) {
+  if (window.__askName === false || (window.__askName !== true && navigator.webdriver)) return Promise.resolve(name);
+  const dot = name.lastIndexOf('.'),
+    ext = dot > 0 ? name.slice(dot) : '',
+    base = dot > 0 ? name.slice(0, dot) : name;
+  return new Promise(res => {
+    const w = document.createElement('div');
+    w.className = 'modal';
+    w.id = 'fnAsk';
+    w.style.zIndex = 90;
+    w.innerHTML =
+      '<div class="mbox" style="width:min(520px,100%)"><h3>Save as</h3><label class="fld"><span>File name</span><div style="display:flex;gap:6px;align-items:center"><input type="text" id="fnIn" style="flex:1;min-width:0" spellcheck="false"><span class="hint" style="margin:0">' +
+      ext.replace(/&/g, '&amp;').replace(/</g, '&lt;') +
+      '</span></div></label><div class="btns"><button class="btn pri" id="fnOk">Save</button><button class="btn" id="fnNo">Cancel</button></div></div>';
+    document.body.appendChild(w);
+    const inp = w.querySelector('#fnIn');
+    inp.value = base;
+    const done = ok => {
+      let v = ok ? inp.value.replace(/[\\/:*?"<>|\u0000-\u001f]+/g, '_').trim() : null;
+      if (v !== null) {
+        if (ext && v.toLowerCase().endsWith(ext.toLowerCase())) v = v.slice(0, v.length - ext.length);
+        v = (v || base) + ext;
+      }
+      w.remove();
+      res(v);
+    };
+    w.querySelector('#fnOk').onclick = () => done(true);
+    w.querySelector('#fnNo').onclick = () => done(false);
+    w.addEventListener('keydown', e => {
+      if (e.key === 'Enter') done(true);
+      else if (e.key === 'Escape') done(false);
+    });
+    inp.focus();
+    inp.select();
+  });
+}
 async function saveFile(name, data, label, msgSel) {
   const m = $(msgSel || '#csvMsg');
   if (!m) return;
+  const nm = await askFileName(name);
+  if (nm === null) {
+    m.textContent = 'Save cancelled.';
+    return;
+  }
+  name = nm;
   try {
     const d = window.claude && claude.use ? await claude.use('downloads') : null;
     if (!d) {

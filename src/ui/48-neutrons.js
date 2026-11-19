@@ -461,6 +461,7 @@ function neuShow() {
     ' n/ion</td><td>' +
     fmt(r.meanE(cs.tot), 4) +
     '</td></tr></table></div>' +
+    tblBar('neu_sr', 'Neutron_yield_per_steradian') +
     '<p class="hint">Angle-integrated check: ∫ Y(θ) dω of the plotted distribution = ' +
     fmt(i4, 4) +
     ' n/ion, total from the energy spectrum = ' +
@@ -571,7 +572,7 @@ function neuPrepDet(r, s, f, q, beam, edges, last) {
   const g = ND.eff.S.geo,
     Rr = g.R / 100,
     Lm = g.Ld / 100,
-    om = 2 * Math.PI * (1 - Lm / Math.sqrt(Lm * Lm + Rr * Rr)),
+    om = ndOmega(g.rb > 0 ? g.rb / 100 : Rr, Lm),
     dE = r.Eo / r.nbo,
     Lp = +s.L > 0 ? +s.L : 25,
     st = Math.max(0, +s.dt || 0) / 2.3548,
@@ -694,10 +695,16 @@ function neuStatHtml() {
     fmt(+neuSet().L > 0 ? +neuSet().L : 25, 4) +
     ' m from the neutron source (' +
     (ND.eff.S.ppac
-      ? 'U-238 deposit on the axis, source in the direction θ, beam spot Ø' + fmt(ND.eff.S.geo.R * 2, 4) + ' cm'
-      : 'front face on the axis, source in the direction θ, cylinder ' + fmt(ND.eff.S.geo.R * 2, 4) + ' × ' + fmt(ND.eff.S.geo.T, 4) + ' cm') +
+      ? 'U-238 deposit on the axis, source in the direction θ, neutron beam spot Ø' + fmt(ND.eff.S.geo.R * 2, 4) + ' cm on the target'
+      : 'front face on the axis, source in the direction θ, ' +
+        (ND.eff.S.geo.rb > 0 && ND.eff.S.geo.rb < ND.eff.S.geo.R - 1e-9 ? 'neutron beam Ø' + fmt(ND.eff.S.geo.rb * 2, 4) + ' cm on the face, ' : '') +
+        'cylinder ' +
+        fmt(ND.eff.S.geo.R * 2, 4) +
+        ' × ' +
+        fmt(ND.eff.S.geo.T, 4) +
+        ' cm') +
     '): the neutrons reaching the detector are the yield per sr at θ × the solid angle of the ' +
-    (ND.eff.S.ppac ? 'beam spot' : 'front face') +
+    (ND.eff.S.ppac ? 'neutron beam spot' : ND.eff.S.geo.rb > 0 && ND.eff.S.geo.rb < ND.eff.S.geo.R - 1e-9 ? 'neutron beam on the front face' : 'front face') +
     ', ω = ' +
     fmt(D.om, 4) +
     ' sr. ' +
@@ -718,7 +725,8 @@ function neuStatHtml() {
     ').</p>' +
     '<div class="tscroll"><table class="t"><tr><th>θ lab (°)</th><th>Yield Y(θ) (n sr⁻¹ per ion)</th><th>Neutrons reaching the detector</th><th>Detected counts N</th><th>± statistical</th><th>± Monte Carlo</th><th>Count rate (s⁻¹)</th><th>± statistical</th><th>± Monte Carlo</th><th>Pile-up level</th><th>Count rate after pile-up (s⁻¹)</th><th>Total efficiency ε<sub>tot</sub></th></tr>' +
     rows +
-    '</table></div>'
+    '</table></div>' +
+    tblBar('neu_stat', 'Neutron_counting_statistics')
   );
 }
 function neuDetRefresh() {

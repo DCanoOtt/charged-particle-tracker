@@ -2,7 +2,7 @@
 const ND_DEF = {
   kind: 'scint',
   ptg: 298,
-  prs: 2,
+  pbd: 4,
   prg: 10000,
   pdist: 2.5,
   prad: 5,
@@ -14,6 +14,7 @@ const ND_DEF = {
   T: 10,
   th: 100,
   res: 20,
+  bd: 0,
   tau: 100,
   pu: 'par',
   N: 20000,
@@ -46,6 +47,7 @@ const ND = {
 function ndSet() {
   const s = neuSet(),
     o = s.det && typeof s.det === 'object' ? s.det : (s.det = {});
+  if (o.pbd === undefined && o.prs > 0) o.pbd = 2 * o.prs; // former input: radius
   for (const k of Object.keys(ND_DEF)) if (o[k] === undefined) o[k] = ND_DEF[k];
   if (o.Emax === 40) o.Emax = 200; // former default
   if (!ND_MAT[o.mat]) {
@@ -55,11 +57,13 @@ function ndSet() {
   }
   return o;
 }
+// effective radius (cm) of the neutron beam on the detector: PPAC = half the beam spot diameter on the target; scintillator = half the beam diameter, at most the radius of the front face
+const ndBeamR = d => (d.kind === 'ppac' ? +d.pbd / 2 : d.bd > 0 ? Math.min(+d.bd, +d.D) / 2 : +d.D / 2);
 // short description of the configured detector (titles of the plots)
 function ndLabel() {
   const d = ndSet();
   return d.kind === 'ppac'
-    ? 'PPAC · U-238 ' + d.ptg + ' μg/cm² · spot Ø' + 2 * d.prs + ' cm · ' + (d.pmode === 'any' ? 'one fragment' : 'both fragments')
+    ? 'PPAC · U-238 ' + d.ptg + ' μg/cm² · neutron beam Ø' + d.pbd + ' cm · ' + (d.pmode === 'any' ? 'one fragment' : 'both fragments')
     : ND_MAT[d.mat].name + ' Ø' + d.D + ' × ' + d.T + ' cm';
 }
 const ndLpAll = d => Object.assign({}, ND_LP[(ND_MAT[d.mat] || ND_MAT.BC501A).curve], d.lpo || {});
@@ -69,7 +73,7 @@ function ndDet() {
   return {
     kind: d.kind,
     ptg: +d.ptg,
-    prs: +d.prs,
+    prs: d.pbd / 2,
     prg: +d.prg,
     pdist: +d.pdist,
     prad: +d.prad,
@@ -81,6 +85,7 @@ function ndDet() {
     T: +d.T,
     th: +d.th,
     res: +d.res,
+    bd: d.kind === 'ppac' ? 0 : +d.bd || 0,
     rho: +d.rho,
     hc: +d.hc,
     lp: ndLpAll(d),
@@ -137,7 +142,7 @@ function ppacSketch() {
     T(250, 100, 'fragment', 'middle', 'var(--ink2)') +
     T(412, 196, 'fragment', 'middle', 'var(--ink2)') +
     dimv(560, 50, 230, 'active Ø', 2 * d.prad + ' cm') +
-    dimv(240, 104, 176, 'spot Ø', 2 * d.prs + ' cm') +
+    dimv(240, 104, 176, 'n beam Ø', d.pbd + ' cm') +
     dimh(171, 330, 258, 'distance to the target', +d.pdist + ' cm') +
     dimh(40, 330, 280, 'flight path L (source – target)', +s.L + ' m') +
     T(
@@ -234,7 +239,7 @@ function ndInputsPpac() {
   return (
     '<div class="row3">' +
     fld('U-238 target thickness (μg/cm²)', nI('data-dk', 'ptg', d.ptg, 'min="0.001"')) +
-    fld('Beam spot radius = radius of the U-238 deposit (cm)', nI('data-dk', 'prs', d.prs, 'min="0.01"')) +
+    fld('Diameter of the neutron beam spot on the U-238 target (cm; the deposit covers the beam)', nI('data-dk', 'pbd', d.pbd, 'min="0.02"')) +
     fld('Effective range of the fragments in U-238 (μg/cm²)', nI('data-dk', 'prg', d.prg, 'min="1"')) +
     '</div><div class="row3">' +
     fld('Distance of each PPAC to the target (cm)', nI('data-dk', 'pdist', d.pdist, 'min="0.1"')) +
@@ -287,6 +292,7 @@ function ndInputsScint() {
     fld('Energy resolution, FWHM at 1 MeVee (%) — ∝ 1/√L', nI('data-dk', 'res', d.res, 'min="0" max="100"')) +
     '</div><div class="row3">' +
     fld('Flight path L (m) — source to front face', nI('data-dkn', 'L', s.L, 'min="0.01"')) +
+    fld('Diameter of the neutron beam on the front face (cm; 0 = whole face, at most D)', nI('data-dk', 'bd', d.bd, 'min="0" step="any"')) +
     fld('Time resolution, FWHM (ns)', nI('data-dkn', 'dt', s.dt, 'min="0"')) +
     fld('Histories per energy', nI('data-dk', 'N', d.N, 'min="1000" step="1000"')) +
     '</div><div class="row3">' +
@@ -338,7 +344,7 @@ function ndDataStatus() {
 }
 function ndHint() {
   return ndSet().kind === 'ppac'
-    ? 'Parallel-plate avalanche counters (PPAC) on both sides of a thin U-238 deposit on the beam axis; the neutrons of the “Neutron counting” card come from a point source at the flight-path distance. A neutron-induced fission (JENDL-5 U-238, MT 18, up to 195 MeV) emits two back-to-back fragments; each one leaves the layer if its path (t − s)/|cos θ| (forward) or s/|cos θ| (backward) from the depth s of the fission is shorter than the effective range, and is detected when it hits the active disc of its PPAC. The efficiency is [1 − exp(−n σ<sub>f</sub>(E))] × η, with n the U-238 atoms per cm² and η the detection probability of the fragments (Monte Carlo over the position in the beam spot, the depth and the isotropic direction). The solid angle of the detector is that of the beam spot seen from the source. There is no pulse height.'
+    ? 'Parallel-plate avalanche counters (PPAC) on both sides of a thin U-238 deposit on the beam axis; the neutrons of the “Neutron counting” card come from a point source at the flight-path distance and hit the target in a spot of the neutron-beam diameter. A neutron-induced fission (JENDL-5 U-238, MT 18, up to 195 MeV) emits two back-to-back fragments; each one leaves the layer if its path (t − s)/|cos θ| (forward) or s/|cos θ| (backward) from the depth s of the fission is shorter than the effective range, and is detected when it hits the active disc of its PPAC. The efficiency is [1 − exp(−n σ<sub>f</sub>(E))] × η, with n the U-238 atoms per cm² and η the detection probability of the fragments (Monte Carlo over the position in the beam spot, the depth and the isotropic direction). The solid angle of the detector is that of the beam spot seen from the source. There is no pulse height.'
     : 'Cylindrical organic scintillator on the beam axis; the neutrons of the “Neutron counting” card come from a point source at the flight-path distance. The efficiency is a Monte Carlo of the neutron transport in the cell (multiple scattering included): ¹H(n,n), ¹²C(n,n), the ¹²C inelastic, (n,α), (n,p) and 3α break-up channels of the library (lumped above 20 MeV); the light of every recoil particle is added, smeared with the energy resolution of the scintillator (Gaussian, FWHM/L = resolution at 1 MeVee divided by √(L/MeVee); 0 = ideal), and an event counts when the smeared light exceeds the threshold.';
 }
 function ndBuild() {
@@ -423,7 +429,8 @@ function ndToJson() {
           d.kind === 'ppac'
             ? {
                 targetThickness_ug_cm2: +d.ptg,
-                beamSpotRadius_cm: +d.prs,
+                neutronBeamSpotDiameter_cm: +d.pbd,
+                neutronBeamSpotRadius_cm: +d.pbd / 2,
                 fragmentEffectiveRange_ug_cm2: +d.prg,
                 ppacDistance_cm: +d.pdist,
                 ppacActiveRadius_cm: +d.prad,
@@ -443,6 +450,8 @@ function ndToJson() {
         resolution_FWHM_at_1MeVee_percent: +d.res,
         lightOutput: ndLpAll(d),
         lightOutputOverrides: d.lpo || {},
+        beamDiameterOnFrontFace_cm: d.kind === 'ppac' ? null : +d.bd || 0,
+        neutronBeamSpotRadius_cm: ndBeamR(d), // effective radius of the neutron beam on the detector (front face or U-238 target)
         flightPath_m: +s.L > 0 ? +s.L : 25,
         timeResolution_FWHM_ns: +s.dt
       },
@@ -473,7 +482,7 @@ function ndFromJson(txt) {
   if (d.kind === 'ppac' && dt.ppac) {
     const p = dt.ppac;
     d.ptg = num(p.targetThickness_ug_cm2, d.ptg);
-    d.prs = num(p.beamSpotRadius_cm, d.prs);
+    d.pbd = num(p.neutronBeamSpotDiameter_cm, p.beamSpotRadius_cm > 0 ? 2 * p.beamSpotRadius_cm : d.pbd);
     d.prg = num(p.fragmentEffectiveRange_ug_cm2, d.prg);
     d.pdist = num(p.ppacDistance_cm, d.pdist);
     d.prad = num(p.ppacActiveRadius_cm, d.prad);
@@ -489,6 +498,7 @@ function ndFromJson(txt) {
   d.th = num(dt.threshold_keVee, d.th);
   d.res = num(dt.resolution_FWHM_at_1MeVee_percent, d.res);
   d.lpo = dt.lightOutputOverrides && typeof dt.lightOutputOverrides === 'object' ? dt.lightOutputOverrides : {};
+  d.bd = num(dt.beamDiameterOnFrontFace_cm, 0);
   s.L = num(dt.flightPath_m, s.L);
   s.dt = num(dt.timeResolution_FWHM_ns, s.dt);
   const dq = o.daq || {};
@@ -695,7 +705,7 @@ function ndShow() {
   const ia = Math.min(Math.max(+d.ia || 0, 0), r.angs.length - 1),
     Rr = f.S.geo.R / 100,
     Lm = f.S.geo.Ld / 100,
-    om = 2 * Math.PI * (1 - Lm / Math.sqrt(Lm * Lm + Rr * Rr)),
+    om = ndOmega(f.S.geo.rb > 0 ? f.S.geo.rb / 100 : Rr, Lm),
     sc = r.sc[q.f],
     dE = r.Eo / r.nbo,
     Y = r.csAll.ang[ia], // the energy threshold of the Neutron counting card does not apply in this window
@@ -1039,7 +1049,9 @@ document.addEventListener('click', ev => {
   if (ev.target.closest('#ndSaveJson')) {
     const d = ndSet();
     return saveFile(
-      d.kind === 'ppac' ? 'detector_PPAC-U238_D' + 2 * d.prs + 'cm_t' + d.ptg + 'ugcm2.json' : 'detector_' + d.mat + '_D' + d.D + 'cm_t' + d.T + 'cm.json',
+      d.kind === 'ppac'
+        ? 'detector_PPAC-U238_t' + d.ptg + 'ugcm2_beamR' + ndBeamR(d) + 'cm.json'
+        : 'detector_' + d.mat + '_D' + d.D + 'cm_t' + d.T + 'cm_beamR' + ndBeamR(d) + 'cm.json',
       ndToJson(),
       'JSON',
       '#ndMsg'

@@ -2,7 +2,7 @@
 const fs = require('fs'), vm = require('vm'), path = require('path'), assert = require('assert');
 const ui = f => fs.readFileSync(path.join(__dirname, '../src/ui', f), 'utf8');
 vm.runInThisContext([ui('43-endf.js'), ui('46-secondaries.js'), ui('51-nd-data.js'), ui('51-nd-data-u.js'), ui('52-nd-engine.js')].join('\n') +
-  ';globalThis.A={ndTof,ndEfromT,ndNpXs,ndSetup,ndEff,ndKin,ND_MAT,ND_LP,ndInvLp,ndLp,ndParseN,ndChannelsC,ndMedium,ndSampleMu,ndRng,ndPulse,ndAtoms,ndEmb,tab1Eval,d2Eval,ndSmear,ndPile,ppacSigma,ppacEta,ppacSetup,ndEff};');
+  ';globalThis.A={ndTof,ndEfromT,ndNpXs,ndSetup,ndEff,ndKin,ND_MAT,ND_LP,ndInvLp,ndLp,ndParseN,ndChannelsC,ndMedium,ndSampleMu,ndRng,ndPulse,ndAtoms,ndEmb,tab1Eval,d2Eval,ndSmear,ndPile,ndOmega,ndEntry,ppacSigma,ppacEta,ppacSetup,ndEff};');
 const A = globalThis.A;
 const near = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, msg + ': ' + a + ' vs ' + b);
 // n-p cross section (ENDF/B-VIII.0: 4.26 b at 1 MeV, 0.689 b at 14 MeV)
@@ -105,5 +105,17 @@ console.log('neutron detector: all checks passed');
     near(b.loss, 0.1 / 1.1, 1e-12, 'non-paralysable loss'); near(b.rec, 1e6 / 1.1, 1e-6, 'non-paralysable recorded');
     assert.strictEqual(c.loss, 0); assert.strictEqual(z.loss, 0); assert.strictEqual(A.ndPile(1e6, 0, 'par').loss, 0);
     console.log('pile-up ok');
+  { // neutron beam of limited diameter on the front face of the scintillator
+    const R = 5, Ld = 100;
+    near(A.ndOmega(R, Ld), 2 * Math.PI * (1 - Ld / Math.sqrt(Ld * Ld + R * R)), 1e-15, 'solid angle');
+    const rng = A.ndRng(5); let m = 0, rmax = 0; const n = 100000, g = { R, T: 10, Ld: 10, rb: 2 };
+    for (let i = 0; i < n; i++) { const e = A.ndEntry(g, rng); m += e.w; rmax = Math.max(rmax, Math.hypot(e.x, e.y)) }
+    assert.ok(rmax <= 2 && rmax > 1.95, 'entry points stay inside the beam: ' + rmax);
+    near((Math.PI * 4 / 100) * (m / n) / A.ndOmega(2, 10), 1, 0.01, 'entry weights reproduce the solid angle of the beam disc');
+    const S = A.ndSetup({ mat: 'BC501A', D: 10, T: 10, th: 100, res: 0, rho: 0.874, hc: 1.212, lp: {}, Lm: 0.1, bd: 4 }, null); near(S.geo.rb, 2, 1e-12, 'rb from the beam diameter');
+    near(A.ndSetup({ mat: 'BC501A', D: 10, T: 10, th: 100, res: 0, rho: 0.874, hc: 1.212, lp: {}, Lm: 0.1, bd: 40 }, null).geo.rb, 5, 1e-12, 'beam larger than D: whole face');
+    near(A.ndSetup({ mat: 'BC501A', D: 10, T: 10, th: 100, res: 0, rho: 0.874, hc: 1.212, lp: {}, Lm: 0.1, bd: 0 }, null).geo.rb, 5, 1e-12, '0: whole face');
+    console.log('beam on the face ok');
+  }
   }
 }

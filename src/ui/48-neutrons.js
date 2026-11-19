@@ -17,7 +17,12 @@ const NEU_DEF = {
   nyl: 'log',
   nxl: 'lin',
   vyl: 'lin',
-  vxl: 'lin'
+  vxl: 'lin',
+  rnb: '',
+  rfl: true,
+  rseed: 1,
+  ryl: 'lin',
+  rxl: 'lin'
 };
 // neutron energy threshold of the emitted neutrons: value in the chosen unit → MeV
 const NEU_EU = { eV: 1e-6, keV: 1e-3, MeV: 1 };
@@ -31,40 +36,6 @@ function neuMask(c, Emin) {
     sum = a => a.reduce((t, v) => t + v, 0);
   return { ...c, ang: c.ang.map(cut), tot: cut(c.tot), W: c.W * (sum(c.tot) > 0 ? sum(cut(c.tot)) / sum(c.tot) : 0) };
 }
-const NEU_MC2 = 939.56542,
-  NEU_C = 0.299792458; // neutron rest energy (MeV), speed of light (m/ns)
-// time of flight (ns) and |dE/dt| (MeV/ns) of a neutron of kinetic energy E (MeV) over L metres; sigma_E of a time resolution st (ns, 1 sigma)
-function neuKin(E, L) {
-  const g = 1 + E / NEU_MC2,
-    b = Math.sqrt(1 - 1 / (g * g)),
-    t = L / (b * NEU_C);
-  return { t, dEdt: (NEU_MC2 * g * g * g * b * b) / t };
-}
-const neuSigE = (E, L, st) => neuKin(E, L).dEdt * st;
-// Gaussian smearing of a spectrum y (per MeV, nbo bins up to Eo) with the energy-dependent width of the time resolution; the integral is kept
-function neuFold(y, nbo, Eo, L, st) {
-  const dE = Eo / nbo,
-    out = new Float64Array(nbo);
-  for (let i = 0; i < nbo; i++) {
-    if (!(y[i] > 0)) continue;
-    const sg = neuSigE((i + 0.5) * dE, L, st);
-    if (!(sg > dE / 2)) {
-      out[i] += y[i];
-      continue;
-    }
-    const j0 = Math.max(0, Math.floor(i - (5 * sg) / dE)),
-      j1 = Math.min(nbo - 1, Math.ceil(i + (5 * sg) / dE)),
-      w = [];
-    let sum = 0;
-    for (let j = j0; j <= j1; j++) {
-      const v = Math.exp((-0.5 * ((j - i) * dE) ** 2) / (sg * sg));
-      w.push(v);
-      sum += v;
-    }
-    for (let j = j0; j <= j1; j++) out[j] += (y[i] * w[j - j0]) / sum;
-  }
-  return out;
-}
 const NEU_ANG0 = [0, 30, 60, 90, 120, 150, 180]; // default angles (replaced by the nearest ENDF angles when the file has a grid)
 const NEU_INT = { 1: 'histogram', 2: 'linear-linear', 3: 'linear-log', 4: 'log-linear', 5: 'log-log' };
 const NEU_QTY = {
@@ -73,7 +44,7 @@ const NEU_QTY = {
   perq: { f: 'perq', u: 'n sr⁻¹ μC⁻¹', t: 'Neutrons per unit of charge', d: 'n/sr/μC' }
 };
 const NEU = {
-  pl: { n: { hidden: {}, z: {} }, v: { hidden: {}, z: {} }, w: { hidden: {}, z: {} }, p: { hidden: {}, z: {} } },
+  pl: { n: { hidden: {}, z: {} }, v: { hidden: {}, z: {} }, w: { hidden: {}, z: {} }, r: { hidden: {}, z: {} }, p: { hidden: {}, z: {} } },
   data: {},
   res: null,
   msg: '',
@@ -498,6 +469,7 @@ function neuShow() {
   neuPlot('n');
   neuPlot('v');
   neuPlot('w');
+  if (NEU.det) neuReconPlot();
   if (NEU.det) {
     neuDetRefresh();
     neuPhCalc();
@@ -579,9 +551,12 @@ function neuPrepDet(r, s, f, q, beam, edges, last) {
     tof = ndSet().dist === 't',
     un = ND_YU[NEU_QTY[s.qty] ? s.qty : 'rate'],
     rows = [],
+    cnts = [],
     series = [];
   r.cs.ang.forEach((a, i) => {
     let var2 = 0;
+    const cnt = new Float64Array(r.nbo); // expected detected neutrons per bin of the true energy over the whole irradiation
+    cnts.push(cnt);
     const det = Float64Array.from(a, (v, j) => {
       let e = 0,
         er = 0;
@@ -590,6 +565,7 @@ function neuPrepDet(r, s, f, q, beam, edges, last) {
         er += ndErrAt((j + (k + 0.5) / 8) * dE);
       }
       const y = (v * f * om * e) / 8;
+      cnt[j] = r.sc.okI && r.sc.okT ? (v * r.sc.tot * om * e * dE) / 8 : 0;
       var2 += Math.pow((v * f * om * dE * er) / 8, 2);
       return y;
     });
@@ -608,7 +584,7 @@ function neuPrepDet(r, s, f, q, beam, edges, last) {
       series.push({ name: 'θ = ' + fmt(r.angs[i], 5) + '°', type: 'line', x, y, color: scol(i), w: 1.8 });
     } else series.push({ name: 'θ = ' + fmt(r.angs[i], 5) + '°', type: 'hist', edges, y: detF, color: scol(i) });
   });
-  NEU.det = { rows, om, un, tof };
+  NEU.det = { rows, om, un, tof, cnts };
   NEU.data.w = {
     series,
     tof,
@@ -634,6 +610,190 @@ function neuPrepDet(r, s, f, q, beam, edges, last) {
     ],
     xmaxAuto: tof ? '' : String(fmt(((last + 2) * r.Eo) / r.nbo, 4))
   };
+  neuRecon(false);
+}
+// Neutron spectrum reconstructed from the time of flight: the expected detected neutrons of every angle (efficiency, solid angle, whole irradiation) get their
+// time of flight, the Gaussian time resolution (FWHM of the card) and are converted back to an energy (neuTofRecon); the content of every bin is a Poisson sample
+// (optional) and its statistical uncertainty is sqrt(counts). The area of the spectrum is the number of neutrons detected during the irradiation.
+function neuRecon(plot) {
+  const D = NEU.det,
+    r = NEU.res,
+    s = neuSet();
+  if (!D || !r) return;
+  NEU.data.r = null;
+  if (r.sc.okI && r.sc.okT) {
+    const nb = Math.max(5, Math.min(5000, Math.round(+s.rnb > 0 ? +s.rnb : r.nbo))),
+      dO = r.Eo / nb,
+      Lp = +s.L > 0 ? +s.L : 25,
+      st = Math.max(0, +s.dt || 0) / 2.3548,
+      fl = s.rfl !== false,
+      series = [],
+      info = [];
+    let last = 0,
+      mx = 0;
+    const res = D.cnts.map(c => neuTofRecon(c, r.Eo, Lp, st, nb));
+    res.forEach(q => q.mu.forEach(v => (mx = Math.max(mx, v))));
+    r.angs.forEach((a, i) => {
+      const { mu, lost } = res[i],
+        rng = ndRng(1000 + 7919 * (+s.rseed || 1) + i),
+        x = [],
+        y = [],
+        err = [],
+        xlo = [],
+        xhi = [],
+        ye = [];
+      let sum = 0,
+        exp = 0;
+      const n = new Float64Array(nb);
+      for (let j = 0; j < nb; j++) {
+        n[j] = fl ? neuPoisson(mu[j], rng) : mu[j];
+        sum += n[j];
+        exp += mu[j];
+        x.push((j + 0.5) * dO);
+        xlo.push(j * dO);
+        xhi.push((j + 1) * dO);
+        y.push(n[j] / dO);
+        err.push(Math.sqrt(n[j]) / dO);
+        ye.push(mu[j] / dO);
+        if (mu[j] > 1e-4 * mx) last = Math.max(last, j);
+      }
+      const nm = 'θ = ' + fmt(a, 5) + '°',
+        tr = D.cnts[i].reduce((t, v) => t + v, 0),
+        tI = r.sc.rate > 0 ? r.sc.tot / r.sc.rate : 0, // irradiation time (s)
+        rate = tI > 0 ? tr / tI : null, // mean rate of the detected neutrons (s⁻¹)
+        pu = rate !== null ? ndPile(rate, ndSet().tau, ndSet().pu) : null;
+      series.push({ name: nm + ' (expected)', type: 'line', x, y: ye, color: scol(i), w: 1.2 });
+      series.push({ name: nm, type: 'pts', x, y, err, xlo, xhi, color: scol(i), r: 2.3, tip: { n, mu, dO, rate, pu, model: ndSet().pu, tau: +ndSet().tau } });
+      info.push(
+        nm +
+          ': ' +
+          fmt(sum, 6) +
+          ' ± ' +
+          fmt(Math.sqrt(sum), 3) +
+          ' counted (' +
+          fmt(tr, 6) +
+          ' expected' +
+          (lost > 1e-6 * tr ? ', ' + fmt(lost, 3) + ' reconstructed above ' + fmt(r.Eo, 4) + ' MeV' : '') +
+          ')'
+      );
+    });
+    NEU.data.r = {
+      series,
+      xlabel: 'Neutron energy reconstructed from the time of flight (MeV)',
+      ylabel: 'Detected neutrons (n MeV⁻¹)',
+      title: 'Neutron spectrum reconstructed by time of flight · ' + ndLabel() + ' · ' + (RES ? RES.beamName + ' ' + fmt(RES.E0nom, 4) + ' MeV' : PJ().name),
+      stats: [
+        'Bins: ' +
+          nb +
+          ' of ' +
+          fmt(dO, 4) +
+          ' MeV (0 – ' +
+          fmt(r.Eo, 4) +
+          ' MeV)' +
+          (+s.rnb > 0 ? '' : ' (same binning as the emitted spectrum)') +
+          ' · area of the spectrum = detected neutrons during the irradiation (' +
+          fmt(+s.tirr, 4) +
+          ' ' +
+          s.tirrU +
+          '): ' +
+          info.join(' · '),
+        'time of flight over ' +
+          fmt(Lp, 4) +
+          ' m with the Gaussian time resolution of ' +
+          fmt(+s.dt, 3) +
+          ' ns FWHM folded in · ' +
+          (fl ? 'bin contents are a Poisson sample of the expected values (random seed ' + (+s.rseed || 1) + ')' : 'expected values') +
+          ' · bars: ±√counts per bin'
+      ],
+      xmaxAuto: String(fmt(Math.min(r.Eo, (last + 3) * dO), 4))
+    };
+  }
+  if (plot) neuReconPlot();
+}
+// window with the values of the bin under the pointer of the reconstructed spectrum; its lower left corner is the pointer + a small distance
+function neuTip(ev, X, Y) {
+  let tip = $('#neuTip');
+  if (X === null) {
+    if (tip) tip.hidden = true;
+    return;
+  }
+  const d = NEU.data.r,
+    st = NEU.pl.r;
+  if (!d) return;
+  // only the point of the bin under the pointer that is nearest to it (vertically) is described
+  const ylog = neuSet().ryl === 'log',
+    dist = v => (ylog ? Math.abs(Math.log10(Math.max(v, 1e-300)) - Math.log10(Math.max(Y, 1e-300))) : Math.abs(v - Y)),
+    cand = d.series
+      .filter(se => se.type === 'pts' && se.tip && !st.hidden[se.name])
+      .map(se => ({ se, j: Math.floor(X / se.tip.dO) }))
+      .filter(c => c.j >= 0 && c.j < c.se.tip.n.length);
+  cand.sort((a, b) => dist(a.se.y[a.j]) - dist(b.se.y[b.j]));
+  const rows = cand.slice(0, 1).map(({ se, j }) => {
+    const t = se.tip,
+      n = t.n[j],
+      sg = Math.sqrt(n);
+    return (
+      '<div class="tr"><b style="color:' +
+      se.color +
+      '">' +
+      se.name +
+      '</b> · E′ = ' +
+      fmt(j * t.dO, 5) +
+      ' – ' +
+      fmt((j + 1) * t.dO, 5) +
+      ' MeV<br>counts / MeV: <b>' +
+      fmt(n / t.dO, 5) +
+      ' ± ' +
+      fmt(sg / t.dO, 3) +
+      '</b><br>counts: <b>' +
+      fmt(n, 5) +
+      ' ± ' +
+      fmt(sg, 3) +
+      '</b> <span class="hint">(expected ' +
+      fmt(t.mu[j], 5) +
+      ')</span><br>pile-up / dead time: <b>' +
+      (t.model === 'off' ? 'model off' : t.pu ? fmt(100 * t.pu.loss, 3) + ' %' : '–') +
+      '</b>' +
+      (t.pu && t.model !== 'off'
+        ? ' <span class="hint">(mean rate ' +
+          fmt(t.rate, 4) +
+          ' s⁻¹, τ = ' +
+          fmt(t.tau, 4) +
+          ' ns, ' +
+          (t.model === 'non' ? 'non-paralysable' : 'paralysable') +
+          ')</span>'
+        : '') +
+      '</div>'
+    );
+  });
+  if (!rows.length) {
+    if (tip) tip.hidden = true;
+    return;
+  }
+  if (!tip) {
+    tip = document.createElement('div');
+    tip.id = 'neuTip';
+    tip.className = 'ptip';
+    document.body.appendChild(tip);
+  }
+  tip.innerHTML = rows.join('');
+  tip.hidden = false;
+  const w = tip.offsetWidth,
+    h = tip.offsetHeight,
+    gap = 12;
+  let x = ev.clientX + gap,
+    y = ev.clientY - gap - h; // lower left corner = pointer + (gap, -gap)
+  if (x + w > innerWidth - 4) x = Math.max(4, ev.clientX - gap - w);
+  if (y < 4) y = Math.min(innerHeight - h - 4, ev.clientY + gap + 4);
+  tip.style.left = x + 'px';
+  tip.style.top = y + 'px';
+}
+function neuReconPlot() {
+  const box = $('#neuP_r');
+  if (!box) return;
+  if (NEU.data.r) return neuPlot('r');
+  box.innerHTML =
+    '<p class="hint">The reconstructed spectrum needs a beam current and an irradiation time (inputs above): the area is the number of neutrons detected during the irradiation.</p>';
 }
 // counting statistics (all angles) and pulse-height spectra from the Monte Carlo of the detector at every angle
 function neuStatHtml() {
@@ -821,6 +981,13 @@ function neuDetHtml() {
     ' (the solid angle is applied separately: ' +
     fmt(D.om, 3) +
     ' sr).</span></div><div id="neuP_w"></div>' +
+    '<h3 class="sub">Neutron spectrum reconstructed from the time of flight</h3><div class="pcbar"><label class="pc-sel"><span>Number of bins</span><input type="number" min="5" max="5000" step="1" data-neur="rnb" style="width:96px" placeholder="' +
+    (NEU.res ? NEU.res.nbo : '') +
+    '" value="' +
+    (+neuSet().rnb > 0 ? +neuSet().rnb : '') +
+    '"></label><label class="pc-sel"><span>Poisson sample</span><input type="checkbox" data-neur="rfl"' +
+    (neuSet().rfl !== false ? ' checked' : '') +
+    '></label><button class="btn sm" id="neuRnew">New random sample</button><span class="hint">Empty = same binning as the emitted spectrum. Counts of the detected neutrons (efficiency, solid angle, irradiation time) with the time-of-flight resolution folded in; ±√counts per bin.</span></div><div id="neuP_r"></div>' +
     (ND.eff && ND.eff.S && ND.eff.S.ppac
       ? ''
       : '<h3 class="sub">Pulse-height spectra of the detected neutrons</h3><div id="neuP_p"><p class="hint">Monte Carlo of the pulse height at every angle running…</p></div>') +
@@ -839,13 +1006,21 @@ function neuOpts(k) {
       let o = { ...se, hidden: !!st.hidden[se.name] };
       if (se.type !== 'hist' && (ylog || xlog)) {
         const x = [],
-          y = [];
+          y = [],
+          err = [],
+          xlo = [],
+          xhi = [];
         for (let i = 0; i < se.x.length; i++) {
           if ((ylog && !(se.y[i] > 0)) || (xlog && !(se.x[i] > 0))) continue;
           x.push(se.x[i]);
           y.push(se.y[i]);
+          if (se.err) err.push(se.err[i]);
+          if (se.xlo) {
+            xlo.push(se.xlo[i]);
+            xhi.push(se.xhi[i]);
+          }
         }
-        o = { ...o, x, y };
+        o = { ...o, x, y, ...(se.err ? { err } : {}), ...(se.xlo ? { xlo, xhi } : {}) };
       }
       return o;
     })
@@ -854,8 +1029,8 @@ function neuOpts(k) {
     series,
     xlog,
     ylog,
-    xmin: z.xmin || ((k === 'n' || k === 'w' || k === 'p') && !xlog && !d.tof ? '0' : ''),
-    xmax: z.xmax || (k === 'n' || k === 'w' ? d.xmaxAuto || '' : ''),
+    xmin: z.xmin || ((k === 'n' || k === 'w' || k === 'r' || k === 'p') && !xlog && !d.tof ? '0' : ''),
+    xmax: z.xmax || (k === 'n' || k === 'w' || k === 'r' ? d.xmaxAuto || '' : ''),
     ymin: z.ymin || '',
     ymax: z.ymax || '',
     xlabel: d.xlabel,
@@ -905,12 +1080,19 @@ function neuPlot(k) {
     g = r.geom,
     ro = $('#neuRo_' + k, box);
   gamZoom(sv, g, 'z', st, () => neuPlot(k));
+  if (k === 'r') {
+    neuTip(null, null);
+    sv.addEventListener('pointerleave', () => neuTip(null, null));
+  }
   sv.addEventListener('pointermove', ev => {
     const q = sv.getBoundingClientRect(),
       px = ((ev.clientX - q.left) / q.width) * g.W,
       py = ((ev.clientY - q.top) / q.height) * g.H;
-    if (px < g.m.l || px > g.m.l + g.iw || py < g.m.t || py > g.m.t + g.ih) return;
-    const X = pxData(g, px, py)[0],
+    if (px < g.m.l || px > g.m.l + g.iw || py < g.m.t || py > g.m.t + g.ih) {
+      if (k === 'r') neuTip(ev, null);
+      return;
+    }
+    const [X, Y] = pxData(g, px, py),
       parts = [];
     o.series.forEach(se => {
       if (se.hidden) return;
@@ -922,6 +1104,9 @@ function neuPlot(k) {
           while (j < e.length - 2 && e[j + 1] <= X) j++;
           v = se.y[j];
         }
+      } else if (se.type === 'pts' && se.xlo) {
+        const j = se.xlo.findIndex((lo, q) => X >= lo && X <= se.xhi[q]);
+        if (j >= 0) v = se.y[j];
       } else if (se.type === 'line' && se.x.length > 1) {
         let j = 0;
         while (j < se.x.length - 2 && se.x[j + 1] < X) j++;
@@ -929,6 +1114,7 @@ function neuPlot(k) {
       }
       if (v != null) parts.push(se.name + ' ' + fmt(v, 4));
     });
+    if (k === 'r') neuTip(ev, X, Y);
     const dd = NEU.data[k];
     ro.textContent =
       (k === 'v' ? 'cos θ = ' : k === 'p' ? 'L = ' : dd && dd.tof ? 't = ' : 'E = ') +
@@ -946,7 +1132,10 @@ async function neuSave(k, kind) {
   const r = renderChart(st.o),
     div = document.createElement('div');
   div.innerHTML = r.svg;
-  const base = 'cpt_neutrons_' + (k === 'n' ? 'spectrum_' : k === 'w' ? 'detected_' : k === 'p' ? 'pulseheight_' : 'angular_') + (PJ() ? PJ().letter : ''),
+  const base =
+      'cpt_neutrons_' +
+      (k === 'n' ? 'spectrum_' : k === 'w' ? 'detected_' : k === 'r' ? 'reconstructed_tof_' : k === 'p' ? 'pulseheight_' : 'angular_') +
+      (PJ() ? PJ().letter : ''),
     ctx = { o: st.o, geom: r.geom, svg: div.querySelector('svg'), base, key: 'neu' + k };
   try {
     const it = await secBuild(ctx, kind);
@@ -1009,8 +1198,14 @@ document.addEventListener('click', ev => {
     saveLocal();
     redo = true;
   }
+  if (t.closest('#neuRnew')) {
+    const s = neuSet();
+    s.rseed = (+s.rseed || 1) + 1;
+    saveLocal();
+    return neuRecon(true);
+  }
   if (redo) return neuUpdate();
-  for (const k of ['n', 'v', 'w', 'p']) {
+  for (const k of ['n', 'v', 'w', 'r', 'p']) {
     if (t.closest('[data-' + k + 'gzr]')) {
       NEU.pl[k].z = {};
       return neuPlot(k);
@@ -1034,6 +1229,14 @@ document.addEventListener('keydown', ev => {
   if (ev.key === 'Enter' && ev.target && ev.target.id === 'neuCust') $('#neuAddC').click();
 });
 document.addEventListener('input', ev => {
+  const rb = ev.target.closest && ev.target.closest('#cNeu [data-neur=rnb]');
+  if (rb) {
+    neuSet().rnb = rb.value === '' ? '' : +rb.value;
+    saveLocal();
+    clearTimeout(NEU.tmr2);
+    NEU.tmr2 = setTimeout(() => neuRecon(true), 300);
+    return;
+  }
   const el = ev.target.closest && ev.target.closest('#cNeu [data-nk]');
   if (!el || el.tagName === 'SELECT') return;
   const k = el.dataset.nk,
@@ -1059,12 +1262,17 @@ document.addEventListener('change', ev => {
     }
     return neuUpdate();
   }
+  if (t.matches('[data-neur=rfl]')) {
+    neuSet().rfl = t.checked;
+    saveLocal();
+    return neuRecon(true);
+  }
   if (t.matches('[data-neudist]')) {
     ndSet().dist = t.value;
     saveLocal();
     return neuUpdate();
   }
-  for (const k of ['n', 'v', 'w', 'p']) {
+  for (const k of ['n', 'v', 'w', 'r', 'p']) {
     if (t.hasAttribute('data-' + k + 'gyl')) {
       neuSet()[k + 'yl'] = t.value;
       saveLocal();

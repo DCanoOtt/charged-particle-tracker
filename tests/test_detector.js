@@ -117,5 +117,24 @@ console.log('neutron detector: all checks passed');
     near(A.ndSetup({ mat: 'BC501A', D: 10, T: 10, th: 100, res: 0, rho: 0.874, hc: 1.212, lp: {}, Lm: 0.1, bd: 0 }, null).geo.rb, 5, 1e-12, '0: whole face');
     console.log('beam on the face ok');
   }
+  { // spectrum reconstructed from the time of flight
+    const T = new Function(require('fs').readFileSync(require('path').join(__dirname, '../src/ui/48-neutrons-tof.js'), 'utf8') + ';return {neuKin,neuPhi,neuEfromT,neuTofRecon,neuPoisson,neuSigE};')();
+    const near2 = (a, b, tol, m) => assert.ok(Math.abs(a - b) <= tol, m + ': ' + a + ' vs ' + b);
+    near2(T.neuPhi(0), 0.5, 1e-7, 'Phi(0)'); near2(T.neuPhi(1), 0.8413447, 2e-7, 'Phi(1)'); near2(T.neuPhi(-2), 0.0227501, 2e-7, 'Phi(-2)');
+    const L = 25, k = T.neuKin(10, L);
+    near2(T.neuEfromT(k.t, L), 10, 1e-9, 'E(t(E))'); assert.strictEqual(T.neuEfromT(L / 0.299792458 * 0.999, L), Infinity);
+    const nbo = 200, Eo = 40, cnt = new Float64Array(nbo); cnt[50] = 1000; // 10.1 MeV (bin 10 - 10.2)
+    const R0 = T.neuTofRecon(cnt, Eo, L, 0, nbo); near2(R0.mu[50], 1000, 1e-9, 'perfect resolution keeps the bin'); near2(R0.lost, 0, 1e-9, 'nothing lost');
+    const nb = 800, R1 = T.neuTofRecon(cnt, Eo, L, 0.5, nb); // fine output bins, sigma_t = 0.5 ns
+    let sum = 0, m1 = 0, m2 = 0; const dO = Eo / nb;
+    for (let i = 0; i < nb; i++) { const E = (i + 0.5) * dO; sum += R1.mu[i]; m1 += R1.mu[i] * E; m2 += R1.mu[i] * E * E }
+    near2(sum + R1.lost, 1000, 1e-6, 'counts conserved'); const mean = m1 / sum, sd = Math.sqrt(m2 / sum - mean * mean);
+    near2(mean, 10.1, 0.05, 'mean energy'); const sg = T.neuSigE(10.1, L, 0.5); assert.ok(Math.abs(sd - Math.sqrt(sg * sg + 0.2 * 0.2 / 12)) < 0.05 * Math.sqrt(sg * sg + 0.2 * 0.2 / 12), 'width of the response: ' + sd + ' vs ' + sg);
+    const rng = A.ndRng(3); let ms = 0, vs = 0; const N = 40000;
+    for (const mm of [3.2, 150]) { ms = 0; vs = 0; for (let i = 0; i < N; i++) { const v = T.neuPoisson(mm, rng); ms += v; vs += v * v }
+      ms /= N; vs = vs / N - ms * ms; near2(ms, mm, 0.03 * mm + 0.05, 'Poisson mean ' + mm); near2(vs, mm, 0.06 * mm + 0.1, 'Poisson variance ' + mm) }
+    assert.strictEqual(T.neuPoisson(0, rng), 0);
+    console.log('TOF reconstruction ok');
+  }
   }
 }

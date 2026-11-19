@@ -312,6 +312,25 @@ with sync_playwright() as p:
     canc = pg.evaluate("()=>({gone:!$('#fnAsk'), msg:$('#txm_neu_stat').textContent})")
     pg.evaluate("()=>{window.__askName=false}")
     check('file names can be edited before saving: box with the default name, forbidden characters replaced, extension kept, Cancel saves nothing', fn0 == 'cpt_Neutron_counting_statistics' and fn1 == 'my_table_name.csv' and canc['gone'] and 'cancelled' in canc['msg'], [fn0, fn1, canc])
+    # spectrum reconstructed from the time of flight (4th plot): area = detected neutrons of the irradiation, error bars, number of bins
+    JS_RC = """()=>{const d=NEU.data.r; if(!d) return {none:true}; const pts=d.series.filter(x=>x.type==='pts'), ln=d.series.filter(x=>x.type==='line');
+      const w=pts[0].xhi[0]-pts[0].xlo[0]; const area=pts.map(p=>p.y.reduce((t,v,i)=>t+v*(p.xhi[i]-p.xlo[i]),0)), areaE=ln.map(p=>p.y.reduce((t,v)=>t+v*w,0)), exp=NEU.det.cnts.map(c=>c.reduce((t,v)=>t+v,0));
+      return {none:false, n:pts.length, nl:ln.length, nb:pts[0].x.length, nbo:NEU.res.nbo, area, areaE, exp, svg:!!$('#neuP_r svg'), errOk:pts.every(p=>p.err.every((e,i)=>e>=0&&Math.abs(e*(p.xhi[i]-p.xlo[i])-Math.sqrt(p.y[i]*(p.xhi[i]-p.xlo[i])))<1e-6*Math.max(1,e*(p.xhi[i]-p.xlo[i])))), rnbIn:!!$('#cNeu [data-neur=rnb]')}}"""
+    rc = pg.evaluate(JS_RC)
+    okA = (not rc['none']) and all(abs(rc['area'][i] - rc['exp'][i]) <= 6 * rc['exp'][i] ** 0.5 + 3 + 0.01 * rc['exp'][i] for i in range(rc['n'])) and all(abs(rc['areaE'][i] - rc['exp'][i]) <= 0.01 * rc['exp'][i] + 1e-9 for i in range(rc['n']))
+    check('neutron card: reconstructed-by-TOF plot with default binning = emitted spectrum, error bars = sqrt(counts), area = detected neutrons of the irradiation', (not rc['none']) and rc['svg'] and rc['rnbIn'] and rc['nb'] == rc['nbo'] and rc['nl'] == rc['n'] and rc['errOk'] and okA, rc)
+    bb = pg.evaluate("()=>{const r=$('#neuC_r svg').getBoundingClientRect(); return {x:r.left+r.width*0.3, y:r.top+r.height*0.5}}")
+    pg.evaluate("()=>$('#neuP_r').scrollIntoView({block:'center'})"); pg.wait_for_timeout(200)
+    bb = pg.evaluate("()=>{const r=$('#neuC_r svg').getBoundingClientRect(); return {x:r.left+r.width*0.3, y:r.top+r.height*0.55}}")
+    pg.mouse.move(bb['x'] - 5, bb['y'] - 5); pg.mouse.move(bb['x'], bb['y']); pg.wait_for_timeout(200)
+    tp = pg.evaluate("()=>{const t=$('#neuTip'); if(!t||t.hidden) return null; const r=t.getBoundingClientRect(); return {txt:t.textContent, l:r.left, b:r.bottom, t:r.top, rows:t.querySelectorAll('.tr').length, nser:NEU.data.r.series.filter(x=>x.type==='pts').length}}")
+    check('neutron card: hovering the reconstructed spectrum opens a window (lower left corner = pointer + small distance) only for the point under the pointer with counts/MeV ± σ, counts ± σ and pile-up / dead time %', tp is not None and tp['rows'] == 1 and tp['nser'] > 1 and 'counts / MeV' in tp['txt'] and '±' in tp['txt'] and 'pile-up / dead time' in tp['txt'] and abs(tp['l'] - bb['x'] - 12) <= 1.5 and (abs(tp['b'] - (bb['y'] - 12)) <= 1.5 or tp['t'] > bb['y']), [tp, bb])
+    pg.mouse.move(5, 5); pg.wait_for_timeout(200)
+    pg.fill('#cNeu [data-neur=rnb]', '40'); pg.wait_for_timeout(700)
+    pg.click('#cNeu [data-neur=rfl]'); pg.wait_for_timeout(300)
+    rc2 = pg.evaluate(JS_RC)
+    check('neutron card: number of bins selectable (40) and Poisson sampling can be switched off (area = expected value)', (not rc2['none']) and rc2['nb'] == 40 and all(abs(rc2['area'][i] - rc2['areaE'][i]) <= 1e-6 * rc2['exp'][i] + 1e-9 for i in range(rc2['n'])), rc2)
+    pg.click('#cNeu [data-neur=rfl]'); pg.fill('#cNeu [data-neur=rnb]', ''); pg.wait_for_timeout(700)
     check('neutron card: both tables (per steradian, counting statistics) have PNG / PDF / Excel / CSV buttons; CSV, xlsx and canvas builders work', tx['ids'] == ['neu_sr', 'neu_stat'] and all(b == 'png,pdf,xlsx,csv' for b in tx['btns']) and tx['csvLines'] == tx['nrow'] and tx['xlsxZip'] and tx['cvOk'] and tx['num'], tx)
     check('neutron card: Counting statistics table (counts and rate, statistical and Monte Carlo uncertainty), pulse-height spectra below the detected-neutron plot, bins and integrals in the plot info boxes',
           'Counting statistics' in cs['h'] and cs['hasMC'] and cs['pileCol'] and cs['rows'] >= 3 and cs['pulse'] and cs['np'] >= 1 and cs['bins'] and cs['nbins'] and 0.99 < cs['ratio'] < 50, cs)
@@ -631,7 +650,7 @@ with sync_playwright() as p:
     check('background preview: zoom enables Reset zoom, which clears it', bz == [False, True], bz)
     sj = pg.evaluate("(()=>{const o=JSON.parse(setupJSON()); return [o.codeVersion, o.layerSummary[0]]})()")
     fn = pg.evaluate("setupFileName()")
-    check('setup file name = symbols + thickness + unit + phase per layer, then the code version', fn.endswith('_v0.2.26.setup.json') and '-g_' in fn, fn)
+    check('setup file name = symbols + thickness + unit + phase per layer, then the code version', fn.endswith('_v0.2.27.setup.json') and '-g_' in fn, fn)
     check('setup file lists symbols, thickness, unit, phase (s/l/g) per layer and the code version', sj[0] and sj[1]['symbols'] and sj[1]['thickness'] > 0 and sj[1]['unit'] and sj[1]['phase'] in ('s', 'l', 'g'), sj)
     ex = pg.evaluate("[measCsv(',').split('\\n').filter(l=>l && l[0]!=='#').length, measRootHists().length, measRootHists()[0].name, measCsv(',').indexOf('sigma_syst')>0]")
     check('CSV rows and ROOT histograms per isotope-γ combination', ex[0] == 1 + MEAS.res_n if False else ex[0] > 24 and ex[1] % 8 == 0 and ex[1] > 0 and ex[3], ex)

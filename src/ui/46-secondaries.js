@@ -236,7 +236,7 @@ function secEmit(pr, ch, tgt, E, W, tot, ang, nbo, dEo, cosT, sinT, kin) {
         ang[i][j] += (((W * d2Eval(d, E, mu)) / TWO_PI) * s * s) / (u * sq) / dEo;
       }
     }
-    const N = 64;
+    const N = Math.max(64, Math.ceil((8 * 4 * u * w) / dEo)); // at least 8 samples per output bin
     for (let m = 0; m < N; m++) {
       const mu = -1 + ((m + 0.5) * 2) / N,
         j = Math.floor((E0 + Ec + 2 * u * w * mu) / dEo);
@@ -396,7 +396,7 @@ function secCompute(F, li, sp, sel, nbo, Eo, angles, kin) {
   const dEo = Eo / nbo,
     tot = new Float64Array(nbo),
     ang = angles.map(() => new Float64Array(nbo)),
-    G = 8;
+    G = 1; // every energy bin of the slowing-down is emitted separately (blocks of several bins gave a comb of spikes)
   const cosT = angles.map(a => Math.cos((a * Math.PI) / 180)),
     sinT = angles.map(a => Math.abs(Math.sin((a * Math.PI) / 180)));
   let Wtot = 0,

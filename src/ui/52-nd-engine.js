@@ -596,25 +596,35 @@ function ndSetup(det, data) {
   return { med, lp, geo, Lth: det.th / 1000 };
 }
 // efficiency at one energy: { eps, err, eps1 }, eps1 = single-collision estimate for normal incidence on the axis
-function ndEff(S, E, N, seed) {
-  const rng = ndRng(seed || 12345);
+// w > 0: the neutron energy is drawn log-uniformly in E exp(±w), i.e. the efficiency is the average over the energy bin of the curve point
+// (resonances of 12C narrower than the grid would otherwise alias into jagged noise)
+function ndEff(S, E, N, seed, w) {
+  const rng = ndRng(seed || 12345),
+    E0 = E;
   let sw = 0,
     sw2 = 0,
     sd = 0;
   for (let h = 0; h < N; h++) {
     const e = ndEntry(S.geo, rng),
-      L = ndHistory(S.med, S.lp, S.geo, E, e.x, e.y, e.ux, e.uy, e.uz, rng);
+      Eh = w > 0 ? E0 * Math.exp((2 * rng() - 1) * w) : E0,
+      L = ndHistory(S.med, S.lp, S.geo, Eh, e.x, e.y, e.ux, e.uy, e.uz, rng);
     sw += e.w;
     sw2 += e.w * e.w;
     if (L > S.Lth) sd += e.w;
   }
   const eps = sw > 0 ? sd / sw : 0,
     neff = sw2 > 0 ? (sw * sw) / sw2 : N,
-    [i, f] = ndIdx(E),
-    St = ndInterp(S.med.tot, i, f),
-    SH = S.med.nH * ndInterp(S.med.sH, i, f),
     Eth = ndInvLp(S.Lth, S.lp),
-    e1 = St > 0 ? (1 - Math.exp(-St * S.geo.T)) * (SH / St) * Math.max(0, (E - Eth) / E) : 0;
+    ns = w > 0 ? 41 : 1;
+  let e1 = 0;
+  for (let k = 0; k < ns; k++) {
+    const Ek = ns > 1 ? E0 * Math.exp(((2 * (k + 0.5)) / ns - 1) * w) : E0,
+      [i, f] = ndIdx(Ek),
+      St = ndInterp(S.med.tot, i, f),
+      SH = S.med.nH * ndInterp(S.med.sH, i, f);
+    e1 += St > 0 ? (1 - Math.exp(-St * S.geo.T)) * (SH / St) * Math.max(0, (Ek - Eth) / Ek) : 0;
+  }
+  e1 /= ns;
   return { eps, err: Math.sqrt(Math.max(eps * (1 - eps), 0) / Math.max(neff, 1)), eps1: e1 };
 }
 // time of flight (ns) over Lm metres of a neutron of kinetic energy E (MeV), and the energy of a neutron with that time of flight

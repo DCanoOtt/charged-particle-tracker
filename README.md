@@ -33,6 +33,10 @@ All files share one global scope per bundle (engine, UI); the number prefix is t
 * Ion flux: track-length weighted, each step spread uniformly over its energy interval (exact bin overlap).
 * Gas density: ideal gas P·M/(R·T) unless the user disables it.
 
+## Supported cross-section libraries
+* **Charged-particle induced reactions (p, d, t, ³He, α):** the program reads TENDL files and also **JENDL-5** and **ENDF/B-VIII.0** files in ENDF-6 format. Both evaluations contain charged-particle sublibraries for only a few isotopes (the light ones). JENDL-5 can be downloaded from <https://wwwndc.jaea.go.jp/jendl/j5/j5.html> and ENDF/B-VIII.0 from <https://www.nndc.bnl.gov/endf-releases/?version=B-VIII.0>. Select the folder with the files in the *Reactions* tab; the file name identifies the projectile and the isotope (for example `d-003_Li_006.endf` for ENDF/B-VIII.0 or `d_003-Li-006.dat` for JENDL-5).
+* **Neutron detector model (Configure neutron detector):** the n+¹H and n+¹²C data are built into the program (`src/ui/51-nd-data.js`, ENDF/B-VIII.0 ACE files 1001.800nc and 6012.800nc at 293.6 K, lib80x); `tools/make_nd_data.js` regenerates them. Above 20 MeV the data are approximate (see the in-program help).
+
 ## Alpha reaction data (TENDL, ENDF-6)
 * `src/ui/43-endf.js` reads MF 3 (cross sections) and the product yields of MF 6; distributions are skipped by record structure. `44-alpha-library.js` handles the folder (File System Access API, directory input as fallback), loads the isotopes of the target and folds the flux; `45-plot-endf.js` is the tab.
 * The engine tallies the path length of the primary ions per layer and energy bin (`result.Lh`, 1000 bins up to the maximum beam energy); folding with σ(E) is done in the UI, so any channel can be inspected without a new run.

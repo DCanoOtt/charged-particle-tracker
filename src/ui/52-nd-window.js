@@ -6,6 +6,8 @@ const ND_DEF = {
   th: 100,
   N: 20000,
   Emax: 200,
+  Ew: 2,
+  Nph: 300000,
   rho: 0.874,
   hc: 1.212,
   lpo: {},
@@ -120,6 +122,11 @@ function ndInputs() {
     fld('Histories per energy', nI('data-dk', 'N', d.N, 'min="1000" step="1000"')) +
     '</div><div class="row3">' +
     fld('Largest neutron energy of the efficiency curve (MeV)', nI('data-dk', 'Emax', d.Emax, 'min="1" max="250"')) +
+    fld(
+      'Monte Carlo histories per angle (pulse-height spectra, reconstructed spectrum, counting statistics)',
+      nI('data-dk', 'Nph', d.Nph, 'min="10000" max="5000000" step="10000"')
+    ) +
+    fld('Energy averaging of the efficiency curve (± %; 0 = point values)', nI('data-dk', 'Ew', d.Ew, 'min="0" max="50"')) +
     '</div>' +
     '<details class="cw"><summary>Light-output curves (NRESP type, editable)</summary><p class="hint">Protons: L<sub>p</sub>(E) = a1·E − a2·[1 − exp(−a3·E<sup>a4</sup>)] (MeVee; Cecil et al. for the NE-213 type liquids, Madey / Verbinski for the plastic). Alphas: L<sub>α</sub> = kα·E<sup>kb</sup>. Carbon recoils: L<sub>C</sub> = c·E<sup>cb</sup>. Electrons are linear (1 MeVee = 1 MeV of electron energy).</p><div class="row3">' +
     [
@@ -154,8 +161,8 @@ function ndDataStatus() {
 function ndBuild() {
   const w = $('#ndWin');
   w.innerHTML =
-    '<div class="mbox" style="width:min(1100px,100%)"><h3>Configure neutron detector</h3>' +
-    '<p class="hint">Cylindrical organic scintillator on the beam axis; the neutrons of the “Neutron counting” card come from a point source at the flight-path distance. The efficiency is a Monte Carlo of the neutron transport in the cell (multiple scattering included): ¹H(n,n), ¹²C(n,n), the ¹²C inelastic, (n,α), (n,p) and 3α break-up channels up to 40 MeV; the light of every recoil particle is added and an event counts when the total light exceeds the threshold.</p>' +
+    '<div class="mbox" style="width:min(1100px,100%)"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;position:sticky;top:-18px;z-index:5;background:var(--panel);padding:4px 0"><h3>Configure neutron detector</h3><button class="btn pri" data-ndclose id="ndDoneTop">Done</button></div>' +
+    '<p class="hint">Cylindrical organic scintillator on the beam axis; the neutrons of the “Neutron counting” card come from a point source at the flight-path distance. The efficiency is a Monte Carlo of the neutron transport in the cell (multiple scattering included): ¹H(n,n), ¹²C(n,n), the ¹²C inelastic, (n,α), (n,p) and 3α break-up channels of the library (lumped above 20 MeV); the light of every recoil particle is added and an event counts when the total light exceeds the threshold.</p>' +
     '<div id="ndSketch">' +
     ndSketch() +
     '</div>' +
@@ -174,8 +181,14 @@ function ndOpen() {
 }
 
 // ---- running ----
-const ndKey = () => JSON.stringify([ndDet(), neuSet().dt, ndSet().N, ndSet().Emax, ND.data.nH, ND.data.nC, (ND.data.H || {}).nMt, (ND.data.C || {}).nMt]);
-const ndEnergies = Emax => Array.from({ length: 80 }, (_, i) => 0.1 * Math.pow(Math.max(Emax, 0.2) / 0.1, i / 79));
+const ndKey = () =>
+  JSON.stringify([ndDet(), neuSet().dt, ndSet().N, ndSet().Emax, ndSet().Ew, ND.data.nH, ND.data.nC, (ND.data.H || {}).nMt, (ND.data.C || {}).nMt]);
+// log grid with a spacing of 1.5 % (resolves the resonance structure of 12C), 80 points at least
+const ndEnergies = Emax => {
+  const em = Math.max(Emax, 0.2),
+    n = Math.min(900, Math.max(80, Math.ceil(Math.log(em / 0.1) / 0.015) + 1));
+  return Array.from({ length: n }, (_, i) => 0.1 * Math.pow(em / 0.1, i / (n - 1)));
+};
 async function ndCalc() {
   const my = ++ND.gen,
     msg = $('#ndMsg'),
@@ -186,15 +199,16 @@ async function ndCalc() {
   const det = ndDet(),
     S = ndSetup(det, ND.data),
     E = ndEnergies(+d.Emax || 200),
+    ew = d.Ew > 0 ? Math.log(1 + d.Ew / 100) : 0,
     eps = [],
     err = [],
     e1 = [];
   for (let i = 0; i < E.length; i++) {
-    const r = ndEff(S, E[i], Math.max(1000, +d.N || 20000), 1000 + i);
+    const r = ndEff(S, E[i], Math.max(1000, +d.N || 20000), 1000 + i, ew);
     eps.push(r.eps);
     err.push(r.err);
     e1.push(r.eps1);
-    if (i % 4 === 3) {
+    if (i % 25 === 24) {
       if (msg) msg.textContent = 'Monte Carlo: ' + (i + 1) + ' / ' + E.length + ' energies…';
       await new Promise(r2 => setTimeout(r2, 0));
       if (my !== ND.gen) return;
@@ -238,6 +252,41 @@ function ndEffAt(E) {
 }
 
 // ---- results ----
+// Monte Carlo of the detector for the neutron spectrum Y (per energy bin of the card): pulse-height, reconstructed energy and time-of-flight histograms
+function ndPhPrep(S, Y, r) {
+  const dE = r.Eo / r.nbo;
+  let mx = 0;
+  Y.forEach(v => (mx = Math.max(mx, v)));
+  let eLast = 0,
+    eFirst = 0;
+  Y.forEach((v, j) => {
+    if (v > 1e-4 * mx) eLast = j;
+  });
+  while (eFirst < r.nbo - 1 && !(Y[eFirst] > 1e-4 * mx)) eFirst++;
+  return { eFirst, eLast, Lmax: Math.max(0.2, ndLp((eLast + 1) * dE, S.lp) * 1.2) };
+}
+function ndPhRun(S, Y, r, Lp, st, N, seed, LmaxIn) {
+  const dE = r.Eo / r.nbo,
+    cdf = new Float64Array(r.nbo),
+    Ec = Float64Array.from({ length: r.nbo }, (_, j) => (j + 0.5) * dE);
+  let acc = 0;
+  for (let j = 0; j < r.nbo; j++) {
+    acc += Y[j];
+    cdf[j] = acc;
+  }
+  for (let j = 0; j < r.nbo; j++) cdf[j] /= acc || 1;
+  const { eFirst, eLast, Lmax: L0 } = ndPhPrep(S, Y, r),
+    Lmax = LmaxIn || L0,
+    nb = 200,
+    rec = { nE: r.nbo, Eo: r.Eo, nT: 240, Lm: Lp, st, dE, t0: ndTof((eLast + 1) * dE, Lp) - 4 * st, t1: ndTof(Math.max(0.2, eFirst * dE), Lp) + 4 * st },
+    pr = ndPulse(S, Ec, cdf, N, nb, Lmax, seed, rec);
+  return { Lmax, nb, all: pr.all, sw: pr.sw, recE: pr.recE, recT: pr.recT, rec, sw2: pr.sw2, sd: pr.sd, sd2: pr.sd2, nd: pr.nd, N: pr.N, Lth: S.Lth };
+}
+const ndRatio = P => {
+  const p = P.sw > 0 ? P.sd / P.sw : 0,
+    v = P.sw > 0 ? Math.max(0, P.sd2 * (1 - 2 * p) + p * p * P.sw2) / (P.sw * P.sw) : 0;
+  return { p, sp: Math.sqrt(v) };
+};
 const ND_YU = { rate: ['counts s⁻¹', 's⁻¹'], tot: ['counts', ''], perq: ['counts µC⁻¹', 'µC⁻¹'] };
 function ndShow() {
   const box = $('#ndRes');
@@ -263,7 +312,16 @@ function ndShow() {
     xlabel: 'Neutron energy (MeV)',
     ylabel: 'Efficiency (events above threshold / neutrons on the face)',
     title: 'Detector efficiency · ' + ND_MAT[d.mat].name + ' Ø' + d.D + ' × ' + d.T + ' cm · threshold ' + d.th + ' keVee',
-    stats: ['L = ' + neuSet().L + ' m (point source on the axis) · statistical error of the Monte Carlo: ≤ ' + fmt(Math.max(...f.err), 2) + ' (1σ)']
+    stats: [
+      'L = ' +
+        neuSet().L +
+        ' m (point source on the axis) · statistical error of the Monte Carlo: ≤ ' +
+        fmt(Math.max(...f.err), 2) +
+        ' (1σ) · ' +
+        (d.Ew > 0
+          ? 'averaged over ± ' + d.Ew + ' % in neutron energy at each point (smooths the resonance structure of ¹²C)'
+          : 'point values, no energy averaging')
+    ]
   };
   let html = stale ? '<p class="warn">The parameters changed since the last calculation — press <b>Calculate efficiency</b> to update the plots.</p>' : '';
   html += '<h3 class="sub">Efficiency</h3><div id="ndP_e"></div>';
@@ -323,30 +381,12 @@ function ndShow() {
     xmaxAuto: tof ? '' : String(fmt((last + 2) * dE, 4))
   };
   // pulse-height spectrum: neutron energies drawn from the spectrum at this angle
-  const cdf = new Float64Array(r.nbo),
-    Ec = Float64Array.from({ length: r.nbo }, (_, j) => (j + 0.5) * dE);
   let acc = 0;
-  for (let j = 0; j < r.nbo; j++) {
-    acc += Y[j];
-    cdf[j] = acc;
-  }
+  for (let j = 0; j < r.nbo; j++) acc += Y[j];
   const Ytot = acc * dE,
     ntot = Ytot * sc * om;
-  const key = [f.key, ia, r.cs.W, r.Eo, s.L, s.dt].join('|');
-  if (!ND.ph || ND.ph.key !== key) {
-    for (let j = 0; j < r.nbo; j++) cdf[j] /= acc || 1;
-    let eLast = 0;
-    Y.forEach((v, j) => {
-      if (v > 1e-4 * Math.max(...Y)) eLast = j;
-    });
-    let eFirst = 0;
-    while (eFirst < r.nbo - 1 && !(Y[eFirst] > 1e-4 * Math.max(...Y))) eFirst++;
-    const Lmax = Math.max(0.2, ndLp((eLast + 1) * dE, f.S.lp) * 1.2),
-      nb = 200,
-      rec = { nE: r.nbo, Eo: r.Eo, nT: 240, Lm: Lp, st, dE, t0: ndTof((eLast + 1) * dE, Lp) - 4 * st, t1: ndTof(Math.max(0.2, eFirst * dE), Lp) + 4 * st },
-      pr = ndPulse(f.S, Ec, cdf, 300000, nb, Lmax, 4242, rec);
-    ND.ph = { key, Lmax, nb, all: pr.all, sw: pr.sw, recE: pr.recE, recT: pr.recT, rec, sw2: pr.sw2, sd: pr.sd, sd2: pr.sd2, nd: pr.nd, N: pr.N };
-  }
+  const key = [f.key, ia, r.cs.W, r.Eo, s.L, s.dt, d.Nph].join('|');
+  if (!ND.ph || ND.ph.key !== key) ND.ph = { key, ...ndPhRun(f.S, Y, r, Lp, st, Math.max(10000, +d.Nph || 300000), 4242) };
   const P = ND.ph,
     dL = P.Lmax / P.nb,
     ledges = new Float64Array(P.nb + 1);
@@ -383,7 +423,9 @@ function ndShow() {
     title: 'Reconstructed ' + (rtof ? 'time-of-flight' : 'energy') + ' spectrum (full-statistics Monte Carlo)',
     stats: [
       angTxt +
-        ' · 300000 neutron histories · events above ' +
+        ' · ' +
+        P.N +
+        ' neutron histories · events above ' +
         d.th +
         ' keVee · time of flight over ' +
         fmt(Lp, 4) +

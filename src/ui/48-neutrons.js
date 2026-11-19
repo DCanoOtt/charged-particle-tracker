@@ -58,7 +58,14 @@ const NEU_QTY = {
   tot: { f: 'tot', u: 'n sr⁻¹', t: 'Total number of neutrons produced', d: 'n/sr' },
   perq: { f: 'perq', u: 'n sr⁻¹ µC⁻¹', t: 'Neutrons per unit of charge', d: 'n/sr/µC' }
 };
-const NEU = { pl: { n: { hidden: {}, z: {} }, v: { hidden: {}, z: {} }, w: { hidden: {}, z: {} } }, data: {}, res: null, msg: '', gen: 0, tmr: null };
+const NEU = {
+  pl: { n: { hidden: {}, z: {} }, v: { hidden: {}, z: {} }, w: { hidden: {}, z: {} }, p: { hidden: {}, z: {} } },
+  data: {},
+  res: null,
+  msg: '',
+  gen: 0,
+  tmr: null
+};
 function neuSet() {
   // filled in place: callers keep a reference while calling other functions that also call neuSet()
   const o = S.neu && typeof S.neu === 'object' ? S.neu : (S.neu = {});
@@ -240,6 +247,11 @@ function neuRender() {
     });
   neuUpdate();
 }
+const neuInt = (a, f, dE) => {
+  let t = 0;
+  for (let j = 0; j < a.length; j++) t += a[j] * f * dE;
+  return t;
+};
 function neuUpdate() {
   const my = ++NEU.gen;
   clearTimeout(NEU.tmr);
@@ -446,6 +458,10 @@ function neuShow() {
   neuPlot('n');
   neuPlot('v');
   neuPlot('w');
+  if (NEU.det) {
+    neuDetRefresh();
+    neuPhCalc();
+  }
 }
 // raw series of the two plots for the current quantity
 function neuPrep() {
@@ -472,7 +488,19 @@ function neuPrep() {
     xlabel: 'Neutron energy (MeV)',
     ylabel: q.t + ' (' + q.u + ' MeV⁻¹)',
     title: 'Neutron spectra emitted from the target · ' + beam,
-    stats: ['Target: ' + mats + ' · ideal spectra at the target (no flight path, no detector, no resolution)'],
+    stats: [
+      'Target: ' + mats + ' · ideal spectra at the target (no flight path, no detector, no resolution)',
+      'Bins: ' +
+        r.nbo +
+        ' of ' +
+        fmt(r.Eo / r.nbo, 4) +
+        ' MeV (0 – ' +
+        fmt(r.Eo, 4) +
+        ' MeV) · integral of the spectrum: ' +
+        r.cs.ang.map((a, i) => 'θ = ' + fmt(r.angs[i], 5) + '°: ' + fmt(neuInt(a, f, r.Eo / r.nbo), 4)).join(' · ') +
+        ' ' +
+        q.u
+    ],
     xmaxAuto: String(fmt(((last + 2) * r.Eo) / r.nbo, 4))
   };
   const xs = r.grid,
@@ -548,6 +576,16 @@ function neuPrepDet(r, s, f, q, beam, edges, last) {
     ylabel: 'Detected neutrons (' + un[0] + (tof ? ' ns⁻¹' : ' MeV⁻¹') + ')',
     title: 'Neutrons detected · ' + ND_MAT[ndSet().mat].name + ' Ø' + ndSet().D + ' × ' + ndSet().T + ' cm · ' + beam,
     stats: [
+      'Bins: ' +
+        r.nbo +
+        ' of ' +
+        fmt(dE, 4) +
+        ' MeV' +
+        (tof ? ' (converted to time of flight)' : '') +
+        ' · integral of the spectrum (detected neutrons): ' +
+        rows.map(x => 'θ = ' + fmt(x.a, 5) + '°: ' + fmt(x.tot, 4)).join(' · ') +
+        ' ' +
+        un[0],
       'spectrum × solid angle of the front face (' +
         fmt(om, 3) +
         ' sr) × intrinsic efficiency · time resolution ' +
@@ -556,6 +594,132 @@ function neuPrepDet(r, s, f, q, beam, edges, last) {
     ],
     xmaxAuto: tof ? '' : String(fmt(((last + 2) * r.Eo) / r.nbo, 4))
   };
+}
+// counting statistics (all angles) and pulse-height spectra from the Monte Carlo of the detector at every angle
+function neuStatHtml() {
+  const r = NEU.res,
+    D = NEU.det,
+    sc = r.sc,
+    ph = NEU.phc && NEU.phc.list,
+    T = sc.okI && sc.okT ? sc.tot / sc.rate : 0,
+    f2 = (v, e) => (v === null ? '…' : fmt(v, e)),
+    fq = NEU_QTY[neuSet().qty] ? r.sc[NEU_QTY[neuSet().qty].f] : sc.rate;
+  const rows = r.angs
+    .map((a, i) => {
+      const ysr = r.ysr(r.cs.ang[i]),
+        nc = ysr * sc.tot * D.om,
+        nr = ysr * sc.rate * D.om,
+        R = ph ? ndRatio(ph[i]) : null,
+        eps = R ? R.p : D.rows[i].tot / (ysr * fq * D.om || 1),
+        N = nc * eps,
+        Rt = nr * eps,
+        mc = R && R.p > 0 ? R.sp / R.p : null,
+        c = sc.okI && sc.okT,
+        sN = Math.sqrt(Math.max(N, 0));
+      return (
+        '<tr><td>' +
+        fmt(a, 6) +
+        '</td><td>' +
+        (c ? fmt(N, 5) : '–') +
+        '</td><td>' +
+        (c ? '± ' + fmt(sN, 3) : '–') +
+        '</td><td>' +
+        (c ? '± ' + f2(mc === null ? null : N * mc, 3) : '–') +
+        '</td><td>' +
+        (sc.okI ? fmt(Rt, 5) : '–') +
+        '</td><td>' +
+        (c ? '± ' + fmt(sN / T, 3) : '–') +
+        '</td><td>' +
+        (sc.okI ? '± ' + f2(mc === null ? null : Rt * mc, 3) : '–') +
+        '</td><td>' +
+        fmt(eps, 4) +
+        (R ? ' ± ' + fmt(R.sp, 2) : '') +
+        '</td></tr>'
+      );
+    })
+    .join('');
+  return (
+    '<p class="hint">' +
+    (T
+      ? 'Irradiation time T = ' + fmt(T, 5) + ' s. '
+      : 'Enter the beam current and the irradiation time to get the counts and the statistical uncertainty of the rate. ') +
+    'Statistical = Poisson √N of the detected counts (√N / T for the rate): the uncertainty a real measurement would have. Monte Carlo = uncertainty of the efficiency calculation (' +
+    (ph ? ph[0].N : '…') +
+    ' histories per angle), reduced by running more histories.</p>' +
+    '<div class="tscroll"><table class="t"><tr><th>θ lab (°)</th><th>Detected counts N</th><th>± statistical</th><th>± Monte Carlo</th><th>Count rate (s⁻¹)</th><th>± statistical</th><th>± Monte Carlo</th><th>⟨ε⟩ intrinsic</th></tr>' +
+    rows +
+    '</table></div>'
+  );
+}
+function neuDetRefresh() {
+  const box = $('#neuStat');
+  if (!box || !NEU.res || !NEU.det) return;
+  box.innerHTML = neuStatHtml();
+  const ph = NEU.phc && NEU.phc.list,
+    r = NEU.res;
+  if (!ph) return;
+  const D = NEU.det,
+    s = neuSet(),
+    qk = NEU_QTY[s.qty] ? s.qty : 'rate',
+    f = r.sc[NEU_QTY[qk].f],
+    series = [],
+    ints = [];
+  ph.forEach((P, i) => {
+    const dL = P.Lmax / P.nb,
+      ntot = r.ysr(r.cs.ang[i]) * f * D.om,
+      ledges = new Float64Array(P.nb + 1);
+    for (let j = 0; j <= P.nb; j++) ledges[j] = j * dL;
+    const y = Float64Array.from(P.all, v => (P.sw > 0 ? (v / P.sw) * ntot : 0) / dL);
+    let tot = 0,
+      thr = 0;
+    y.forEach((v, j) => {
+      tot += v * dL;
+      if ((j + 0.5) * dL > P.Lth) thr += v * dL;
+    });
+    ints.push('θ = ' + fmt(r.angs[i], 5) + '°: ' + fmt(thr, 4) + ' above the threshold (' + fmt(tot, 4) + ' all events)');
+    series.push({ name: 'θ = ' + fmt(r.angs[i], 5) + '°', type: 'hist', edges: ledges, y, color: scol(i) });
+  });
+  NEU.data.p = {
+    series,
+    xlabel: 'Light output (MeVee)',
+    ylabel: 'Detected neutrons (' + D.un[0] + ' MeVee⁻¹)',
+    title: 'Pulse-height spectra · ' + ND_MAT[ndSet().mat].name + ' Ø' + ndSet().D + ' × ' + ndSet().T + ' cm',
+    stats: [
+      'Bins: ' +
+        ph[0].nb +
+        ' of ' +
+        fmt(ph[0].Lmax / ph[0].nb, 4) +
+        ' MeVee (0 – ' +
+        fmt(ph[0].Lmax, 4) +
+        ' MeVee) · integral of the spectrum: ' +
+        ints.join(' · '),
+      'same vertical quantity as the detected-neutron plot · threshold ' + ndSet().th + ' keVee · ' + ph[0].N + ' histories per angle'
+    ]
+  };
+  neuPlot('p');
+}
+let neuPhGen = 0;
+async function neuPhCalc() {
+  const r = NEU.res;
+  if (!r || !NEU.det || !ND.eff || !ND.eff.S) return;
+  const s = neuSet(),
+    key = [ND.eff.key, r.Eo, r.nbo, r.angs.join(), r.cs.W, s.L, s.dt, r.sc.rate, ndSet().Nph].join('|');
+  if (NEU.phc && NEU.phc.key === key) return neuDetRefresh();
+  NEU.phc = null;
+  const my = ++neuPhGen,
+    Lp = +s.L > 0 ? +s.L : 25,
+    st = Math.max(0, +s.dt || 0) / 2.3548,
+    S = ND.eff.S,
+    list = [];
+  await new Promise(res => setTimeout(res, 30));
+  for (let i = 0; i < r.angs.length; i++) {
+    if (my !== neuPhGen) return;
+    list.push(ndPhRun(S, r.cs.ang[i], r, Lp, st, Math.max(10000, +ndSet().Nph || 300000), 777 + i));
+    await new Promise(res => setTimeout(res, 0));
+  }
+  if (my !== neuPhGen) return;
+  NEU.phc = { key, list };
+  neuDetRefresh();
 }
 function neuDetHtml() {
   const D = NEU.det,
@@ -575,16 +739,8 @@ function neuDetHtml() {
     '<span class="hint">Intrinsic efficiency = events above the threshold / neutrons entering the front face (the solid angle is applied separately: ' +
     fmt(D.om, 3) +
     ' sr).</span></div><div id="neuP_w"></div>' +
-    '<div class="tscroll"><table class="t"><tr><th>θ lab (°)</th><th>Detected neutrons (' +
-    esc(D.un[0]) +
-    ')</th><th>± Monte Carlo (1σ)</th></tr>' +
-    D.rows
-      .map(
-        x =>
-          '<tr><td>' + fmt(x.a, 6) + '</td><td>' + fmt(x.tot, 5) + '</td><td>' + fmt(x.err, 2) + ' (' + fmt((100 * x.err) / (x.tot || 1), 2) + ' %)</td></tr>'
-      )
-      .join('') +
-    '</table></div><p class="hint">The ± is the statistical error of the efficiency Monte Carlo. The pulse-height spectrum and the reconstructed spectrum of one angle (300000 histories) are in the detector window.</p>';
+    '<h3 class="sub">Pulse-height spectra of the detected neutrons</h3><div id="neuP_p"><p class="hint">Monte Carlo of the pulse height at every angle running…</p></div>' +
+    '<h3 class="sub">Counting statistics</h3><div id="neuStat"></div>';
   return h;
 }
 function neuOpts(k) {
@@ -614,7 +770,7 @@ function neuOpts(k) {
     series,
     xlog,
     ylog,
-    xmin: z.xmin || ((k === 'n' || k === 'w') && !xlog && !d.tof ? '0' : ''),
+    xmin: z.xmin || ((k === 'n' || k === 'w' || k === 'p') && !xlog && !d.tof ? '0' : ''),
     xmax: z.xmax || (k === 'n' || k === 'w' ? d.xmaxAuto || '' : ''),
     ymin: z.ymin || '',
     ymax: z.ymax || '',
@@ -691,9 +847,9 @@ function neuPlot(k) {
     });
     const dd = NEU.data[k];
     ro.textContent =
-      (k === 'v' ? 'cos θ = ' : dd && dd.tof ? 't = ' : 'E = ') +
+      (k === 'v' ? 'cos θ = ' : k === 'p' ? 'L = ' : dd && dd.tof ? 't = ' : 'E = ') +
       fmt(X, 5) +
-      (k === 'v' ? '' : dd && dd.tof ? ' ns' : ' MeV') +
+      (k === 'v' ? '' : k === 'p' ? ' MeVee' : dd && dd.tof ? ' ns' : ' MeV') +
       '   |   ' +
       parts.join('   |   ');
   });
@@ -706,7 +862,7 @@ async function neuSave(k, kind) {
   const r = renderChart(st.o),
     div = document.createElement('div');
   div.innerHTML = r.svg;
-  const base = 'cpt_neutrons_' + (k === 'n' ? 'spectrum_' : k === 'w' ? 'detected_' : 'angular_') + (PJ() ? PJ().letter : ''),
+  const base = 'cpt_neutrons_' + (k === 'n' ? 'spectrum_' : k === 'w' ? 'detected_' : k === 'p' ? 'pulseheight_' : 'angular_') + (PJ() ? PJ().letter : ''),
     ctx = { o: st.o, geom: r.geom, svg: div.querySelector('svg'), base, key: 'neu' + k };
   try {
     const it = await secBuild(ctx, kind);
@@ -770,7 +926,7 @@ document.addEventListener('click', ev => {
     redo = true;
   }
   if (redo) return neuUpdate();
-  for (const k of ['n', 'v', 'w']) {
+  for (const k of ['n', 'v', 'w', 'p']) {
     if (t.closest('[data-' + k + 'gzr]')) {
       NEU.pl[k].z = {};
       return neuPlot(k);
@@ -824,7 +980,7 @@ document.addEventListener('change', ev => {
     saveLocal();
     return neuUpdate();
   }
-  for (const k of ['n', 'v', 'w']) {
+  for (const k of ['n', 'v', 'w', 'p']) {
     if (t.hasAttribute('data-' + k + 'gyl')) {
       neuSet()[k + 'yl'] = t.value;
       saveLocal();

@@ -252,7 +252,7 @@ with sync_playwright() as p:
     check('sketch follows the inputs', pg.evaluate("()=>/10 cm/.test($('#ndSketch').textContent)&&/12 m/.test($('#ndSketch').textContent)"))
     pg.click('#ndRun'); pg.wait_for_function('ND.eff&&!ND.busy', timeout=120000); pg.wait_for_timeout(500)
     nd2 = pg.evaluate("""()=>({svg:['e','d','h'].map(k=>!!$('#ndP_'+k+' svg')), n:ND.eff.E.length, e25:ndEffAt(2.5), e14:ndEffAt(14), kinds:Object.keys(ND.raw), ph:ND.raw.h.series.length, stat:$('#ndDataLbl').textContent})""")
-    check('efficiency curve, detected-neutron distribution and pulse-height spectrum are plotted; 10 cm x 10 cm cell: 30-70 % at 2.5 MeV, 15-40 % at 14 MeV', nd2['svg'] == [True, True, True] and nd2['n'] == 80 and 0.3 < nd2['e25'] < 0.7 and 0.15 < nd2['e14'] < 0.4, nd2)
+    check('efficiency curve, detected-neutron distribution and pulse-height spectrum are plotted; 10 cm x 10 cm cell: 30-70 % at 2.5 MeV, 15-40 % at 14 MeV', nd2['svg'] == [True, True, True] and nd2['n'] >= 300 and 0.3 < nd2['e25'] < 0.7 and 0.15 < nd2['e14'] < 0.4, nd2)
     rc = pg.evaluate("""()=>{const f=a=>{let t=0; for(let i=0;i<a.y.length;i++){t+=a.y[i]*(a.edges[i+1]-a.edges[i])} return t}; return {svg:!!$('#ndP_r svg'), rec:f(ND.raw.r.series[0]), exp:f(ND.raw.d.series[0]), t:ND.raw.r.title, dbg:(()=>{const P=ND.ph,S=a=>Array.from(a).reduce((x,y)=>x+y,0); let ab=0; P.all.forEach((v,i)=>{if((i+.5)*P.Lmax/P.nb>ND.eff.S.Lth)ab+=v}); const r=NEU.res; return {sw:P.sw,recE:S(P.recE),ab,recT:S(P.recT),L:P.rec,Eo:r.Eo,nbo:r.nbo}})()}}""")
     check('reconstructed energy spectrum from the full-statistics Monte Carlo agrees with the expected detected distribution (15 %)', rc['svg'] and rc['exp'] > 0 and abs(rc['rec'] / rc['exp'] - 1) < 0.15 and 'Reconstructed energy' in rc['t'], rc)
     check('statistics table: detected neutrons with Monte Carlo uncertainty', pg.evaluate("()=>{const t=$('#ndRes').textContent; return /Detected neutrons \\(above 100 keVee\\)/.test(t)&&/±/.test(t)&&/detected events out of 300000 histories/.test(t)}"))
@@ -267,10 +267,16 @@ with sync_playwright() as p:
     check('material EJ-309 sets the density 0.959 g/cm3 and H/C 1.25', pg.evaluate("()=>[$('#ndWin [data-dk=rho]').value, $('#ndWin [data-dk=hc]').value]") == ['0.959', '1.25'])
     pg.click('#ndRun'); pg.wait_for_function('ND.eff&&!ND.busy&&ND.eff.key===ndKey()', timeout=120000); pg.wait_for_timeout(500)
     check('recalculated with EJ-309', pg.evaluate("()=>ND.eff.S.med.fromFile.C&&ND.eff.S.med.fromFile.H&&ND.raw.e.title.includes('EJ-309')"))
+    check('Done button in the upper right corner of the detector window', pg.evaluate("()=>{const b=$('#ndDoneTop'),h=$('#ndWin h3');return !!b&&b.textContent==='Done'&&b.getBoundingClientRect().left>h.getBoundingClientRect().left&&Math.abs(b.getBoundingClientRect().top-h.getBoundingClientRect().top)<40}"))
     pg.click('#ndWin [data-ndclose]'); pg.wait_for_timeout(300)
     check('window closes', pg.evaluate("()=>$('#ndWin').hidden"))
     wd = pg.evaluate("()=>{ndSet().dist='E'; neuShow(); const f=a=>{let t=0; for(let i=0;i<a.y.length;i++){t+=a.y[i]*(a.edges[i+1]-a.edges[i])} return t}; const w=NEU.data.w; return {svg:!!$('#neuP_w svg'), n:w&&w.series.length, tot:w&&f(w.series[0]), tab:NEU.det&&NEU.det.rows[0].tot, txt:/Detected neutrons/.test($('#neuRes').textContent)}}")
     check('neutron card: detected-neutron spectra (spectrum x solid angle x efficiency) whose integral equals the detected total', wd['svg'] and wd['n'] >= 1 and wd['txt'] and wd['tab'] > 0 and abs(wd['tot'] / wd['tab'] - 1) < 0.1, wd)
+    pg.wait_for_function("()=>NEU.phc&&NEU.phc.list&&NEU.data.p", timeout=60000)
+    cs = pg.evaluate("""()=>{const t=$('#neuStat').textContent, h=$$('#neuRes h3.sub').map(x=>x.textContent), p=NEU.data.p; const f=a=>{let t=0;for(let i=0;i<a.y.length;i++)t+=a.y[i]*(a.edges[i+1]-a.edges[i]);return t};
+      return {h, hasMC:/Monte Carlo/.test(t)&&/statistical/.test(t), rows:$$('#neuStat table.t tr').length, pulse:!!$('#neuP_p svg'), np:p.series.length, bins:/Bins: 200/.test(p.stats[0])&&/integral/.test(p.stats[0]), nbins:/Bins: /.test(NEU.data.n.stats[1])&&/integral/.test(NEU.data.n.stats[1])&&/Bins: /.test(NEU.data.w.stats[0]), ratio:f(p.series[0])/NEU.det.rows[0].tot, tab:$$('#neuStat table.t tr').map(r=>r.textContent.replace(/\s+/g,' ')).join(' | '), phN:NEU.phc.list.map(P=>[P.N,P.nd,P.sw2>0?P.sw*P.sw/P.sw2:0])}}""")
+    check('neutron card: Counting statistics table (counts and rate, statistical and Monte Carlo uncertainty), pulse-height spectra below the detected-neutron plot, bins and integrals in the plot info boxes',
+          'Counting statistics' in cs['h'] and cs['hasMC'] and cs['rows'] >= 3 and cs['pulse'] and cs['np'] >= 1 and cs['bins'] and cs['nbins'] and 0.99 < cs['ratio'] < 50, cs)
     pg.evaluate("()=>{neuSet().L=25; neuSet().dt=3}")
     pg.evaluate("()=>{delete S.neu.ang; neuUpdate()}"); pg.wait_for_timeout(800)
     # alpha file with the neutron production MT201 (a_013-Al-027.dat): merged into MT5, neutron spectrum available

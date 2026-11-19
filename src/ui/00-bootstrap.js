@@ -5,7 +5,7 @@ const PT = new Function(ENGINE_SRC + '\n;return PT;')();
 const $ = (s, r) => (r || document).querySelector(s),
   $$ = (s, r) => [...(r || document).querySelectorAll(s)];
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
-const APP_VERSION = '0.2.2'; // code version, written into saved setup files
+const APP_VERSION = '0.2.24'; // code version, written into saved setup files
 let _uid = 1;
 const uid = () => 'i' + _uid++;
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -21,10 +21,10 @@ function fmt(v, p) {
       .replace('e+', 'e');
   return String(+v.toPrecision(p));
 }
-const LEN = { nm: 1e-7, µm: 1e-4, mm: 0.1, cm: 1, m: 100 };
+const LEN = { nm: 1e-7, μm: 1e-4, mm: 0.1, cm: 1, m: 100 };
 const LENU = Object.keys(LEN);
 function autoLen(cm) {
-  return cm < 1e-5 ? 'nm' : cm < 0.1 ? 'µm' : cm < 10 ? 'mm' : 'cm';
+  return cm < 1e-5 ? 'nm' : cm < 0.1 ? 'μm' : cm < 10 ? 'mm' : 'cm';
 }
 function fmtLen(cm) {
   const u = autoLen(cm);

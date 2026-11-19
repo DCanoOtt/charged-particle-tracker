@@ -21,7 +21,7 @@ const PARTICLES = [
 ];
 function defaultState() {
   return {
-    layers: [{ id: uid(), t: 100, tu: 'µm', def: presetDef('Silicon') }],
+    layers: [{ id: uid(), t: 100, tu: 'μm', def: presetDef('Silicon') }],
     beam: { pid: 'a', Z: 2, A: 4, E: 5.486, Eu: 'MeV', fwhm: 0, spot: 0, div: 0, dir: [0, 0, 1] },
     phys: {
       delta: true,
@@ -85,7 +85,7 @@ function saveLocal() {
 }
 function loadLocal() {
   try {
-    const j = JSON.parse(localStorage.getItem('chargedtracker.v1') || 'null');
+    const j = JSON.parse((localStorage.getItem('chargedtracker.v1') || 'null').replace(/\u00b5/g, '\u03bc'));
     if (!j) return;
     if (Array.isArray(j.USERLIB)) USERLIB = j.USERLIB;
     if (j.S && j.S.layers && j.S.layers.length) {
@@ -98,7 +98,7 @@ function applyState(o) {
   S.layers = (o.layers || d.layers).map(l => ({
     id: uid(),
     t: +l.t > 0 ? +l.t : 1,
-    tu: LEN[l.tu] || l.tu === 'mg/cm²' || l.tu === 'g/cm²' ? l.tu : 'µm',
+    tu: LEN[l.tu] || l.tu === 'mg/cm²' || l.tu === 'g/cm²' ? l.tu : 'μm',
     def: l.def ? l.def : null
   }));
   S.beam = Object.assign(d.beam, o.beam || {});

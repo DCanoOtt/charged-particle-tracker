@@ -16,7 +16,7 @@ function fmtHl(t) {
   if (!(t > 0)) return '–';
   const u = [
     [1e-6, 'ns', 1e-9],
-    [1e-3, 'µs', 1e-6],
+    [1e-3, 'μs', 1e-6],
     [1, 'ms', 1e-3],
     [60, 's', 1],
     [3600, 'min', 60],
@@ -121,7 +121,7 @@ function actRender() {
           ['pps', 'particles / s'],
           ['pA', 'pA'],
           ['nA', 'nA'],
-          ['uA', 'µA'],
+          ['uA', 'μA'],
           ['mA', 'mA']
         ])
       ) +

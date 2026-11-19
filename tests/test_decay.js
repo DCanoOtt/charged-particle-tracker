@@ -23,7 +23,7 @@ const { DEC, decName, decPrefetch, dkLoadFiles, dkSolve, dkInfo, dkInternal, par
   const tab2 = { 10: { st: 'rad', T: 3600, br: [{ f: 1, d: 20, lab: 'β−' }] }, 20: { st: 'rad', T: 1e-9, br: [{ f: 1, d: 30, lab: 'β−' }] }, 30: { st: 'stable', br: [] } };
   const r2 = await dkSolve({ prod: new Map([[10, R]]), info: id => tab2[id], Tirr: Ti, Tc: 0, chain: true });
   assert.ok(r2.fast[1], 'fast'); assert.ok(Math.abs(r2.act[1][r2.nI - 1] / r2.act[0][r2.nI - 1] - 1) < 1e-9); assert.ok(Math.abs(r2.Nirr[2] / (R * Ti - r2.Nirr[0]) - 1) < 1e-6, 'mass balance');
-  // stiff chain: 1 µs daughter (solved exactly) and 1e-18 s daughter (equilibrium), parent 1 h; grand-daughter stable — mass balance and equilibrium
+  // stiff chain: 1 μs daughter (solved exactly) and 1e-18 s daughter (equilibrium), parent 1 h; grand-daughter stable — mass balance and equilibrium
   const tab4 = { 10: { st: 'rad', T: 3600, br: [{ f: 1, d: 20, lab: 'β−' }] }, 20: { st: 'rad', T: 1e-6, br: [{ f: 1, d: 30, lab: 'β−' }] }, 30: { st: 'rad', T: 1e-18, br: [{ f: 1, d: 40, lab: 'α' }] }, 40: { st: 'stable', br: [] } };
   const r4 = await dkSolve({ prod: new Map([[10, R]]), info: id => tab4[id], Tirr: Ti, Tc, chain: true });
   for (const k of [r4.nI - 1, r4.nT - 1]) { assert.ok(Math.abs(r4.act[1][k] / r4.act[0][k] - 1) < 1e-6, 'equilibrium daughter 1 ' + k); assert.ok(Math.abs(r4.act[2][k] / r4.act[0][k] - 1) < 1e-6, 'equilibrium daughter 2 ' + k); }

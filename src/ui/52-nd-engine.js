@@ -1,6 +1,6 @@
 /* ====== Neutron detector: efficiency and pulse-height Monte Carlo of a cylindrical organic scintillator (BC-501A / EJ-301, EJ-309, BC-400) ======
    Point source on the axis at the flight-path distance; free paths from the macroscopic cross sections of H and C; 1H(n,n) and 12C(n,n), the 12C inelastic, (n,p), (n,α)
-   and break-up channels; light from the proton / α / carbon light-output curves (NRESP style: L_p = a1 E - a2 [1 - exp(-a3 E^a4)]); events above a threshold in MeVee are counted.
+   and break-up channels; light from the proton / α / carbon light-output curves (NRESP style: L_p = a1 E - a2 [1 - exp(-a3 E^a4)]); the light is smeared with the resolution of the scintillator (FWHM/L ∝ 1/√L); events above a threshold in MeVee are counted.
    Cross sections: ENDF/B-VIII.0 files for n+1H and n+12C (MF3 and the MF4 elastic angular distribution) when they are loaded, otherwise rough built-in tables (see ND_NOTE). */
 const ND_NA = 6.02214076e23,
   ND_MN = 939.56542, // neutron mass (MeV)
@@ -588,12 +588,19 @@ function ndEntry(geo, rng) {
     d = Math.sqrt(x * x + y * y + geo.Ld * geo.Ld);
   return { x, y, ux: x / d, uy: y / d, uz: geo.Ld / d, w: Math.pow(geo.Ld / d, 3) };
 }
+// light-output resolution: FWHM/L = res / sqrt(L / 1 MeVee) (statistical, res = FWHM/L at 1 MeVee); Gaussian smearing of the total light of one history
+function ndSmear(L, res, rng) {
+  if (!(res > 0) || !(L > 0)) return L;
+  const g = Math.sqrt(-2 * Math.log(1 - rng())) * Math.cos(2 * Math.PI * rng()),
+    sg = (res * Math.sqrt(L)) / 2.3548;
+  return Math.max(0, L + g * sg);
+}
 function ndSetup(det, data) {
   const med = ndMedium(det.rho, det.hc, data);
   med.angIso = ND_ISO;
   const lp = Object.assign({}, ND_LP[(ND_MAT[det.mat] || ND_MAT.BC501A).curve], det.lp || {}),
     geo = { R: det.D / 2, T: det.T, Ld: det.Lm * 100 };
-  return { med, lp, geo, Lth: det.th / 1000 };
+  return { med, lp, geo, Lth: det.th / 1000, res: det.res > 0 ? det.res / 100 : 0 };
 }
 // efficiency at one energy: { eps, err, eps1 }, eps1 = single-collision estimate for normal incidence on the axis
 // w > 0: the neutron energy is drawn log-uniformly in E exp(±w), i.e. the efficiency is the average over the energy bin of the curve point
@@ -607,7 +614,7 @@ function ndEff(S, E, N, seed, w) {
   for (let h = 0; h < N; h++) {
     const e = ndEntry(S.geo, rng),
       Eh = w > 0 ? E0 * Math.exp((2 * rng() - 1) * w) : E0,
-      L = ndHistory(S.med, S.lp, S.geo, Eh, e.x, e.y, e.ux, e.uy, e.uz, rng);
+      L = ndSmear(ndHistory(S.med, S.lp, S.geo, Eh, e.x, e.y, e.ux, e.uy, e.uz, rng), S.res, rng);
     sw += e.w;
     sw2 += e.w * e.w;
     if (L > S.Lth) sd += e.w;
@@ -662,7 +669,7 @@ function ndPulse(S, Ecent, cdf, N, nb, Lmax, seed, rec) {
     }
     const e = ndEntry(S.geo, rng),
       En = r.dE > 0 ? Ecent[lo] + (rng() - 0.5) * r.dE : Ecent[lo], // energy uniform inside the bin of the histogram
-      L = ndHistory(S.med, S.lp, S.geo, En, e.x, e.y, e.ux, e.uy, e.uz, rng);
+      L = ndSmear(ndHistory(S.med, S.lp, S.geo, En, e.x, e.y, e.ux, e.uy, e.uz, rng), S.res, rng);
     sw += e.w;
     sw2 += e.w * e.w;
     if (L > S.Lth) {

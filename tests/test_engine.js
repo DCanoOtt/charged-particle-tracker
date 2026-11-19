@@ -37,7 +37,7 @@ const at = (t, E) => { const i = Math.max(1, t.E.findIndex(e => e >= E)), f = Ma
 // 4. energy balance: deposited + escaping = incoming; stopped particles all end inside the layer
 { const si = MAT.Si(), r = run(ALPHA, 5, si, 0.01, 1000, 3); let dep = 0; for (let k = 0; k < r.N; k++) dep += r.dEdep[k];
   near(dep, 5 * r.N, 1e-4, 'all the energy is deposited in a layer thicker than the range'); assert.strictEqual(r.esc.nStopP, r.N, 'all primaries stop'); assert.strictEqual(r.esc.nTransP + r.esc.nBackP, 0);
-  const thin = run(ALPHA, 5, si, 0.001, 500, 3); assert.ok(thin.esc.nTransP >= 485 && thin.esc.nStopP <= 3, 'a 10 µm layer is crossed by 5 MeV alphas: ' + JSON.stringify(thin.esc)); }
+  const thin = run(ALPHA, 5, si, 0.001, 500, 3); assert.ok(thin.esc.nTransP >= 485 && thin.esc.nStopP <= 3, 'a 10 μm layer is crossed by 5 MeV alphas: ' + JSON.stringify(thin.esc)); }
 // 5. energy-loss ordering: a heavier target stops more per cm than a lighter one; range of protons scales ~ E^1.8
 { const rSi = at(PT.stopTable(MAT.Si(), PROTON, 0.5, 50, 60, {}), 5).R, rAu = at(PT.stopTable(MAT.Au(), PROTON, 0.5, 50, 60, {}), 5).R; assert.ok(rAu / MAT.Au().rho < rSi / MAT.Si().rho, 'protons stop in a shorter distance in gold than in silicon');
   const w = MAT.water(), t = PT.stopTable(w, PROTON, 0.5, 300, 80, {}), p = Math.log(at(t, 100).R / at(t, 10).R) / Math.log(10); assert.ok(p > 1.7 && p < 1.9, 'proton range exponent ' + p); }

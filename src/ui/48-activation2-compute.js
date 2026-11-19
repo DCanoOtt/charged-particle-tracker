@@ -415,7 +415,7 @@ async function actCompute(my) {
     '<p class="hint"><b>Irradiation:</b> ' +
     fmt(I, 4) +
     ' ' +
-    (s.IU === 'pps' ? 'particles/s' : { pA: 'pA', nA: 'nA', uA: 'µA', mA: 'mA' }[s.IU]) +
+    (s.IU === 'pps' ? 'particles/s' : { pA: 'pA', nA: 'nA', uA: 'μA', mA: 'mA' }[s.IU]) +
     ' of ' +
     P.plural +
     (s.IU === 'pps' ? '' : ' (charge ' + q + 'e → ' + fmt(rate, 4) + ' particles/s)') +

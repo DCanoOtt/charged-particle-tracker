@@ -2,7 +2,7 @@
 const fs = require('fs'), vm = require('vm'), path = require('path'), assert = require('assert');
 const ui = f => fs.readFileSync(path.join(__dirname, '../src/ui', f), 'utf8');
 vm.runInThisContext([ui('43-endf.js'), ui('46-secondaries.js'), ui('51-nd-data.js'), ui('52-nd-engine.js')].join('\n') +
-  ';globalThis.A={ndTof,ndEfromT,ndNpXs,ndSetup,ndEff,ndKin,ND_MAT,ND_LP,ndInvLp,ndLp,ndParseN,ndChannelsC,ndMedium,ndSampleMu,ndRng,ndPulse,ndAtoms,ndEmb,tab1Eval,d2Eval};');
+  ';globalThis.A={ndTof,ndEfromT,ndNpXs,ndSetup,ndEff,ndKin,ND_MAT,ND_LP,ndInvLp,ndLp,ndParseN,ndChannelsC,ndMedium,ndSampleMu,ndRng,ndPulse,ndAtoms,ndEmb,tab1Eval,d2Eval,ndSmear};');
 const A = globalThis.A;
 const near = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, msg + ': ' + a + ' vs ' + b);
 // n-p cross section (ENDF/B-VIII.0: 4.26 b at 1 MeV, 0.689 b at 14 MeV)
@@ -62,4 +62,18 @@ console.log('neutron detector: all checks passed');
   assert.ok(A.d2Eval(C.ang, 14.1, 1) > 3 * A.d2Eval(C.ang, 14.1, -1), 'C-12 elastic forward peaked at 14 MeV'); near(A.d2Eval(H.ang, 5, 0.9) / A.d2Eval(H.ang, 5, -0.9), 1, 0.1, 'H-1 almost isotropic in CM');
   const med = A.ndMedium(0.874, 1.212, { H, C }); assert.ok(med.fromFile.H && med.fromFile.C && med.fromFile.angH && med.fromFile.angC, 'medium uses the embedded files');
   console.log('embedded ACE data ok');
+}
+
+// light-output resolution: FWHM/L = 20 % at 1 MeVee, scaling as 1/sqrt(L); 0 = ideal
+{
+  const rng = A.ndRng(5);
+  for (const [L, rel] of [[1, 0.2], [4, 0.1], [0.25, 0.4]]) {
+    let m = 0, m2 = 0; const n = 40000;
+    for (let i = 0; i < n; i++) { const v = A.ndSmear(L, 0.2, rng); m += v; m2 += v * v }
+    m /= n; const sd = Math.sqrt(m2 / n - m * m);
+    near(m / L, 1, 0.01, 'mean light unchanged at ' + L + ' MeVee'); near(sd / L * 2.3548, rel, 0.01 * rel + 0.004, 'FWHM/L at ' + L + ' MeVee');
+  }
+  assert.strictEqual(A.ndSmear(2, 0, rng), 2, 'resolution 0 leaves the light unchanged');
+  assert.strictEqual(A.ndSetup({ mat: 'BC501A', D: 10, T: 10, th: 100, res: 20, rho: 0.874, hc: 1.212, lp: {}, Lm: 25 }, null).res, 0.2);
+  console.log('light resolution ok');
 }

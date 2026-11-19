@@ -3,7 +3,7 @@ let _chart = null; // {opts, geom}
 const lenSel = [
   ['auto', 'auto'],
   ['nm', 'nm'],
-  ['µm', 'µm'],
+  ['μm', 'μm'],
   ['mm', 'mm'],
   ['cm', 'cm']
 ];
@@ -168,7 +168,7 @@ const PLOTS = {
         type: 'select',
         opts: [
           ['mass', 'MeV cm²/g'],
-          ['kum', 'keV/µm'],
+          ['kum', 'keV/μm'],
           ['mcm', 'MeV/cm'],
           ['srim', 'eV/(10¹⁵ atoms/cm²)']
         ]
@@ -180,7 +180,7 @@ const PLOTS = {
         opts: [
           ['g/cm²', 'g/cm²'],
           ['mg/cm²', 'mg/cm²'],
-          ['µm', 'µm'],
+          ['μm', 'μm'],
           ['mm', 'mm'],
           ['cm', 'cm']
         ]
@@ -232,7 +232,7 @@ const PLOTS = {
         const fS = s.sU === 'mass' ? 1 : s.sU === 'kum' ? rho * 0.1 : s.sU === 'mcm' ? rho : m.Abar * 1.66054e-3;
         const nm = idx.length > 1 ? i + 1 + ' · ' + layerName(l, i) : '';
         if (s.quant === 'range') {
-          const fR = s.rU === 'g/cm²' ? 1 : s.rU === 'mg/cm²' ? 1e3 : s.rU === 'µm' ? 1e4 / rho : s.rU === 'mm' ? 10 / rho : 1 / rho;
+          const fR = s.rU === 'g/cm²' ? 1 : s.rU === 'mg/cm²' ? 1e3 : s.rU === 'μm' ? 1e4 / rho : s.rU === 'mm' ? 10 / rho : 1 / rho;
           series.push({ name: nm || 'CSDA range', x, y: tb.R.map(v => v * fR), color: scol(ci++) });
         } else if (idx.length > 1) series.push({ name: nm, x, y: tb.Stot.map(v => v * fS), color: scol(ci++) });
         else {
@@ -274,7 +274,7 @@ const PLOTS = {
             note += '<p class="err">' + esc(e.message) + '</p>';
           }
       }
-      const sUl = { mass: 'MeV cm²/g', kum: 'keV/µm', mcm: 'MeV/cm', srim: 'eV/(10¹⁵ atoms/cm²)' }[s.sU];
+      const sUl = { mass: 'MeV cm²/g', kum: 'keV/μm', mcm: 'MeV/cm', srim: 'eV/(10¹⁵ atoms/cm²)' }[s.sU];
       if (!series.length && !note) note = '<p class="hint">Choose a layer that contains a material.</p>';
       return {
         series,
@@ -296,7 +296,7 @@ const PLOTS = {
         label: 'Energy loss unit',
         type: 'select',
         opts: [
-          ['kum', 'keV/µm  (= eV/nm)'],
+          ['kum', 'keV/μm  (= eV/nm)'],
           ['mmm', 'MeV/mm'],
           ['mcm', 'MeV/cm']
         ]
@@ -348,7 +348,7 @@ const PLOTS = {
         series,
         bands,
         xlabel: 'Depth z (' + u + ')',
-        ylabel: 'Energy loss dE/dz per primary (' + { kum: 'keV/µm', mmm: 'MeV/mm', mcm: 'MeV/cm' }[s.yU] + ')',
+        ylabel: 'Energy loss dE/dz per primary (' + { kum: 'keV/μm', mmm: 'MeV/mm', mcm: 'MeV/cm' }[s.yU] + ')',
         title: R.beamName + ' ' + fmtE(R.E0nom)
       };
     }

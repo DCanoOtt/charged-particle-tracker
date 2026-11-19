@@ -56,7 +56,7 @@ const NEU_INT = { 1: 'histogram', 2: 'linear-linear', 3: 'linear-log', 4: 'log-l
 const NEU_QTY = {
   rate: { f: 'rate', u: 'n s⁻¹ sr⁻¹', t: 'Neutron rate', d: 'n/s/sr' },
   tot: { f: 'tot', u: 'n sr⁻¹', t: 'Total number of neutrons produced', d: 'n/sr' },
-  perq: { f: 'perq', u: 'n sr⁻¹ µC⁻¹', t: 'Neutrons per unit of charge', d: 'n/sr/µC' }
+  perq: { f: 'perq', u: 'n sr⁻¹ μC⁻¹', t: 'Neutrons per unit of charge', d: 'n/sr/μC' }
 };
 const NEU = {
   pl: { n: { hidden: {}, z: {} }, v: { hidden: {}, z: {} }, w: { hidden: {}, z: {} }, p: { hidden: {}, z: {} } },
@@ -172,7 +172,7 @@ function neuCompute(F, layers, angs, Eo, nbo) {
   return c;
 }
 
-// scale factors of the three quantities: per ion → n/s (rate), n over the irradiation, n per µC
+// scale factors of the three quantities: per ion → n/s (rate), n over the irradiation, n per μC
 function neuScale(s, P) {
   const I = +s.I,
     q = +s.q > 0 ? +s.q : P.Z,
@@ -217,7 +217,7 @@ function neuRender() {
           ['pps', 'particles / s'],
           ['pA', 'pA'],
           ['nA', 'nA'],
-          ['uA', 'µA'],
+          ['uA', 'μA'],
           ['mA', 'mA']
         ])
       ) +
@@ -235,7 +235,7 @@ function neuRender() {
         sel('qty', [
           ['rate', 'Neutron rate, n/s/sr'],
           ['tot', 'Total number of neutrons produced, n/sr'],
-          ['perq', 'Neutrons per unit of charge, n/sr/µC (= n/s/sr per µA)']
+          ['perq', 'Neutrons per unit of charge, n/sr/μC (= n/s/sr per μA)']
         ])
       ) +
       '</div>' +
@@ -408,8 +408,8 @@ function neuShow() {
       .join('');
   neuPrep();
   box.innerHTML =
-    '<p class="hint"><b>Per steradian at the angles chosen above.</b> Rate = n/s/sr; total = n/sr over the whole irradiation (rate × irradiation time); per charge = n/sr/µC (identical to n/s/sr per µA of beam). The “4π” row integrates over all directions.</p>' +
-    '<div class="tscroll"><table class="t"><tr><th>θ lab (°)</th><th>cos θ</th><th>Angular data</th><th>n s⁻¹ sr⁻¹</th><th>n sr⁻¹</th><th>n sr⁻¹ µC⁻¹</th><th>n sr⁻¹ per ion</th><th>⟨E<sub>n</sub>⟩ (MeV)</th></tr>' +
+    '<p class="hint"><b>Per steradian at the angles chosen above.</b> Rate = n/s/sr; total = n/sr over the whole irradiation (rate × irradiation time); per charge = n/sr/μC (identical to n/s/sr per μA of beam). The “4π” row integrates over all directions.</p>' +
+    '<div class="tscroll"><table class="t"><tr><th>θ lab (°)</th><th>cos θ</th><th>Angular data</th><th>n s⁻¹ sr⁻¹</th><th>n sr⁻¹</th><th>n sr⁻¹ μC⁻¹</th><th>n sr⁻¹ per ion</th><th>⟨E<sub>n</sub>⟩ (MeV)</th></tr>' +
     rows +
     '<tr><td><b>4π, all angles</b></td><td></td><td></td><td>' +
     (sc.okI ? fmt(tot4 * sc.rate, 4) + ' n/s' : '–') +
@@ -417,12 +417,12 @@ function neuShow() {
     (sc.okI && sc.okT ? fmt(tot4 * sc.tot, 4) + ' n' : '–') +
     '</td><td>' +
     fmt(tot4 * sc.perq, 4) +
-    ' n/µC</td><td>' +
+    ' n/μC</td><td>' +
     fmt(tot4, 4) +
     ' n/ion</td><td>' +
     fmt(r.meanE(cs.tot), 4) +
     '</td></tr></table></div>' +
-    '<p class="hint">Angle-integrated check: ∫ Y(θ) dΩ of the plotted distribution = ' +
+    '<p class="hint">Angle-integrated check: ∫ Y(θ) dω of the plotted distribution = ' +
     fmt(i4, 4) +
     ' n/ion, total from the energy spectrum = ' +
     fmt(tot4, 4) +
@@ -620,6 +620,12 @@ function neuStatHtml() {
         '<tr><td>' +
         fmt(a, 6) +
         '</td><td>' +
+        fmt(ysr, 5) +
+        '</td><td>' +
+        (c ? fmt(nc, 5) : '–') +
+        '</td><td>' +
+        (sc.okI ? fmt(nr, 5) : '–') +
+        '</td><td>' +
         (c ? fmt(N, 5) : '–') +
         '</td><td>' +
         (c ? '± ' + fmt(sN, 3) : '–') +
@@ -632,21 +638,39 @@ function neuStatHtml() {
         '</td><td>' +
         (sc.okI ? '± ' + f2(mc === null ? null : Rt * mc, 3) : '–') +
         '</td><td>' +
-        fmt(eps, 4) +
-        (R ? ' ± ' + fmt(R.sp, 2) : '') +
+        fmt((eps * D.om) / (4 * Math.PI), 4) +
+        (R ? ' ± ' + fmt((R.sp * D.om) / (4 * Math.PI), 2) : '') +
         '</td></tr>'
       );
     })
     .join('');
   return (
     '<p class="hint">' +
+    'All numbers are for the detector placed at the flight-path distance L = ' +
+    fmt(+neuSet().L > 0 ? +neuSet().L : 25, 4) +
+    ' m from the neutron source (front face on the axis, source in the direction θ, cylinder ' +
+    fmt(ND.eff.S.geo.R * 2, 4) +
+    ' × ' +
+    fmt(ND.eff.S.geo.T, 4) +
+    ' cm): the neutrons reaching the detector are the yield per sr at θ × the solid angle of the front face, ω = ' +
+    fmt(D.om, 4) +
+    ' sr. ' +
+    (sc.okI
+      ? 'Ion rate = ' +
+        fmt(sc.rate, 5) +
+        ' s⁻¹ (beam current / (charge state × e)); neutron rate on the detector = ion rate × Y(θ) × ω; count rate = that × intrinsic efficiency. '
+      : '') +
     (T
       ? 'Irradiation time T = ' + fmt(T, 5) + ' s. '
       : 'Enter the beam current and the irradiation time to get the counts and the statistical uncertainty of the rate. ') +
     'Statistical = Poisson √N of the detected counts (√N / T for the rate): the uncertainty a real measurement would have. Monte Carlo = uncertainty of the efficiency calculation (' +
     (ph ? ph[0].N : '…') +
-    ' histories per angle), reduced by running more histories.</p>' +
-    '<div class="tscroll"><table class="t"><tr><th>θ lab (°)</th><th>Detected counts N</th><th>± statistical</th><th>± Monte Carlo</th><th>Count rate (s⁻¹)</th><th>± statistical</th><th>± Monte Carlo</th><th>⟨ε⟩ intrinsic</th></tr>' +
+    ' histories per angle), reduced by running more histories. Total efficiency ε<sub>tot</sub> = detected counts / neutrons emitted into 4π at the same yield = intrinsic efficiency × ω / 4π, with ω = ' +
+    fmt(D.om, 4) +
+    ' sr the solid angle of the front face (mean intrinsic efficiencies: ' +
+    r.angs.map((a, i) => 'θ = ' + fmt(a, 5) + '°: ' + fmt(ph ? ndRatio(ph[i]).p : 0, 4)).join(', ') +
+    ').</p>' +
+    '<div class="tscroll"><table class="t"><tr><th>θ lab (°)</th><th>Yield Y(θ) (n sr⁻¹ per ion)</th><th>Neutrons reaching the detector</th><th>Neutron rate on the detector (s⁻¹)</th><th>Detected counts N</th><th>± statistical</th><th>± Monte Carlo</th><th>Count rate (s⁻¹)</th><th>± statistical</th><th>± Monte Carlo</th><th>Total efficiency ε<sub>tot</sub></th></tr>' +
     rows +
     '</table></div>'
   );

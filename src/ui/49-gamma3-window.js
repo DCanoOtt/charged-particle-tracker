@@ -62,7 +62,7 @@ function gamRender() {
       (B.emitted > 0 ? fmt((100 * B.detected) / B.emitted, 3) + ' %' : '–'),
     'pile-up (τ = ' +
       fmt(PU.tau * 1e6, 3) +
-      ' µs' +
+      ' μs' +
       (PU.f > 1 ? ', ' + fmt(PU.f, 3) + ' pulses per full-energy count' : '') +
       '): pulse rate ' +
       fmt(PU.n0, 3) +

@@ -16,7 +16,7 @@ function gamCfgSummary(g) {
     eff +
     ' · pulse width τ = ' +
     g.tau +
-    ' µs' +
+    ' μs' +
     (g.puCurve ? ' · pile-up spectrum on' : '')
   );
 }
@@ -145,8 +145,8 @@ function gamCfgRender() {
     '</div>' +
     '<div id="geCfgEff"></div>' +
     '<h4>DAQ: pulse width and pile-up</h4><div class="mgrid">' +
-    fld('Pulse width τ (µs), pile-up window ±τ', inp('tau', 'min="0"')) +
-    fld('DAQ dead time per pulse (µs), non-paralysable — 0 = none', inp('tauD', 'min="0"')) +
+    fld('Pulse width τ (μs), pile-up window ±τ', inp('tau', 'min="0"')) +
+    fld('DAQ dead time per pulse (μs), non-paralysable — 0 = none', inp('tauD', 'min="0"')) +
     (g.effMode === 'ge'
       ? fld(
           'Pulses per full-energy count',

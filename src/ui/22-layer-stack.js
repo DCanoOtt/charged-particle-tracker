@@ -205,7 +205,7 @@ function drawStack() {
     '>Remove</button></div>';
 }
 function addLayer() {
-  S.layers.push({ id: uid(), t: 100, tu: 'µm', def: presetDef('Aluminium') });
+  S.layers.push({ id: uid(), t: 100, tu: 'μm', def: presetDef('Aluminium') });
   S.sel = S.layers.length - 1;
   drawStack();
   saveLocal();

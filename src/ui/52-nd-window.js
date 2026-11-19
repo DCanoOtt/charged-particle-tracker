@@ -4,6 +4,7 @@ const ND_DEF = {
   D: 10,
   T: 10,
   th: 100,
+  res: 20,
   N: 20000,
   Emax: 200,
   Ew: 2,
@@ -47,7 +48,7 @@ const ndLpAll = d => Object.assign({}, ND_LP[(ND_MAT[d.mat] || ND_MAT.BC501A).cu
 function ndDet() {
   const d = ndSet(),
     s = neuSet();
-  return { mat: d.mat, D: +d.D, T: +d.T, th: +d.th, rho: +d.rho, hc: +d.hc, lp: ndLpAll(d), Lm: +s.L > 0 ? +s.L : 25 };
+  return { mat: d.mat, D: +d.D, T: +d.T, th: +d.th, res: +d.res, rho: +d.rho, hc: +d.hc, lp: ndLpAll(d), Lm: +s.L > 0 ? +s.L : 25 };
 }
 
 // side view of the point source and the cylindrical detector, labelled with the current values
@@ -117,6 +118,8 @@ function ndInputs() {
     fld('Thickness t (cm)', nI('data-dk', 'T', d.T, 'min="0.01"')) +
     fld('Threshold (keVee)', nI('data-dk', 'th', d.th, 'min="0"')) +
     '</div><div class="row3">' +
+    fld('Energy resolution, FWHM at 1 MeVee (%) — ∝ 1/√L', nI('data-dk', 'res', d.res, 'min="0" max="100"')) +
+    '</div><div class="row3">' +
     fld('Flight path L (m) — source to front face', nI('data-dkn', 'L', s.L, 'min="0.01"')) +
     fld('Time resolution, FWHM (ns)', nI('data-dkn', 'dt', s.dt, 'min="0"')) +
     fld('Histories per energy', nI('data-dk', 'N', d.N, 'min="1000" step="1000"')) +
@@ -162,7 +165,7 @@ function ndBuild() {
   const w = $('#ndWin');
   w.innerHTML =
     '<div class="mbox" style="width:min(1100px,100%)"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;position:sticky;top:-18px;z-index:5;background:var(--panel);padding:4px 0"><h3>Configure neutron detector</h3><button class="btn pri" data-ndclose id="ndDoneTop">Done</button></div>' +
-    '<p class="hint">Cylindrical organic scintillator on the beam axis; the neutrons of the “Neutron counting” card come from a point source at the flight-path distance. The efficiency is a Monte Carlo of the neutron transport in the cell (multiple scattering included): ¹H(n,n), ¹²C(n,n), the ¹²C inelastic, (n,α), (n,p) and 3α break-up channels of the library (lumped above 20 MeV); the light of every recoil particle is added and an event counts when the total light exceeds the threshold.</p>' +
+    '<p class="hint">Cylindrical organic scintillator on the beam axis; the neutrons of the “Neutron counting” card come from a point source at the flight-path distance. The efficiency is a Monte Carlo of the neutron transport in the cell (multiple scattering included): ¹H(n,n), ¹²C(n,n), the ¹²C inelastic, (n,α), (n,p) and 3α break-up channels of the library (lumped above 20 MeV); the light of every recoil particle is added, smeared with the energy resolution of the scintillator (Gaussian, FWHM/L = resolution at 1 MeVee divided by √(L/MeVee); 0 = ideal), and an event counts when the smeared light exceeds the threshold.</p>' +
     '<div id="ndSketch">' +
     ndSketch() +
     '</div>' +
@@ -287,7 +290,7 @@ const ndRatio = P => {
     v = P.sw > 0 ? Math.max(0, P.sd2 * (1 - 2 * p) + p * p * P.sw2) / (P.sw * P.sw) : 0;
   return { p, sp: Math.sqrt(v) };
 };
-const ND_YU = { rate: ['counts s⁻¹', 's⁻¹'], tot: ['counts', ''], perq: ['counts µC⁻¹', 'µC⁻¹'] };
+const ND_YU = { rate: ['counts s⁻¹', 's⁻¹'], tot: ['counts', ''], perq: ['counts μC⁻¹', 'μC⁻¹'] };
 function ndShow() {
   const box = $('#ndRes');
   if (!box) return;
@@ -311,7 +314,8 @@ function ndShow() {
     ],
     xlabel: 'Neutron energy (MeV)',
     ylabel: 'Efficiency (events above threshold / neutrons on the face)',
-    title: 'Detector efficiency · ' + ND_MAT[d.mat].name + ' Ø' + d.D + ' × ' + d.T + ' cm · threshold ' + d.th + ' keVee',
+    title:
+      'Detector efficiency · ' + ND_MAT[d.mat].name + ' Ø' + d.D + ' × ' + d.T + ' cm · threshold ' + d.th + ' keVee · resolution ' + d.res + ' % at 1 MeVee',
     stats: [
       'L = ' +
         neuSet().L +

@@ -21,7 +21,7 @@ def run(pg, N=4000):
 
 def ni_ar(pg, E=8, P=10, Pu='kPa'):
     pg.evaluate("""([E,P,Pu])=>{const ar=presetDef('Argon gas'); ar.gas={P,T:293.15,Pu};
-      S.layers=[{id:uid(),t:2,tu:'µm',def:presetDef('Nickel')},{id:uid(),t:5,tu:'cm',def:ar}];S.beam.pid='a';S.beam.E=E;renderAll()}""", [E, P, Pu])
+      S.layers=[{id:uid(),t:2,tu:'μm',def:presetDef('Nickel')},{id:uid(),t:5,tu:'cm',def:ar}];S.beam.pid='a';S.beam.E=E;renderAll()}""", [E, P, Pu])
 
 with sync_playwright() as p:
     b = p.chromium.launch(); pg = b.new_page(viewport={'width': 1300, 'height': 1300})
@@ -235,7 +235,7 @@ with sync_playwright() as p:
     pg.fill('#neuCust', '90'); pg.click('#neuAddC'); pg.wait_for_function('NEU.res&&NEU.res.angs.length===3&&NEU.res.angs.includes(90)', timeout=20000); pg.wait_for_timeout(300)
     nd = pg.evaluate("""()=>{const r=NEU.res, i=r.angs.indexOf(90), y=r.ysr(r.cs.ang[i]); return {angs:r.angs, iso:y*4*Math.PI/r.tot4, chk:r.i4/r.tot4, row:$$('#neuRes table.t tr').map(t=>t.textContent).filter(t=>t.startsWith('90'))[0]||'', chips:$$('#neuChips .chip').length}}""")
     check('any angle (90°) is added and interpolated; the isotropic test data give 4π·Y(90°) = total and ∫Y dΩ = total', nd['angs'] == [0, 90, 180] and abs(nd['iso'] - 1) < 0.03 and abs(nd['chk'] - 1) < 0.06 and 'interpolated' in nd['row'] and nd['chips'] == 3, nd)
-    for q, u in [('tot', 'n sr⁻¹ MeV⁻¹'), ('perq', 'n sr⁻¹ µC⁻¹ MeV⁻¹'), ('rate', 'n s⁻¹ sr⁻¹ MeV⁻¹')]:
+    for q, u in [('tot', 'n sr⁻¹ MeV⁻¹'), ('perq', 'n sr⁻¹ μC⁻¹ MeV⁻¹'), ('rate', 'n s⁻¹ sr⁻¹ MeV⁻¹')]:
         pg.select_option('#cNeu [data-nk=qty]', q); pg.wait_for_timeout(800)
         yl = pg.evaluate("()=>NEU.data.n.ylabel+' | '+NEU.data.v.ylabel")
         check('neutron plot quantity %s: axis label carries the unit' % q, u in yl.split(' | ')[0] and yl.split(' | ')[1].endswith(')') and u.replace(' MeV⁻¹', '') in yl.split(' | ')[1], yl)
@@ -246,8 +246,8 @@ with sync_playwright() as p:
     nb = pg.evaluate("()=>({btn:!!$('#cNeu [data-ndopen].pri'), noL:!$('#cNeu [data-nk=L]'), noDt:!$('#cNeu [data-nk=dt]'), txt:$('#cNeu [data-ndopen]').textContent})")
     check('"Configure neutron detector" is a highlighted button; flight path and time resolution are no longer in the card', nb['btn'] and nb['noL'] and nb['noDt'] and nb['txt'] == 'Configure neutron detector', nb)
     pg.click('#cNeu [data-ndopen]'); pg.wait_for_selector('#ndSketch svg')
-    sk = pg.evaluate("()=>({w:!$('#ndWin').hidden, t:$('#ndSketch').textContent, f:['L','dt'].map(k=>!!$('#ndWin [data-dkn='+k+']')), th:$('#ndWin [data-dk=th]').value, lv:$('#ndWin [data-dkn=L]').value, dv:$('#ndWin [data-dkn=dt]').value, mats:[...$$('#ndWin [data-dk=mat] option')].map(o=>o.value)})")
-    check('detector window: sketch with the flight path, defaults 25 m / 3 ns / 100 keVee, four scintillator choices', sk['w'] and '25 m' in sk['t'] and 'diameter D' in sk['t'] and sk['f'] == [True, True] and sk['th'] == '100' and sk['lv'] == '25' and sk['dv'] == '3' and sk['mats'] == ['BC501A', 'EJ309', 'STILBENE', 'BC400'], sk)
+    sk = pg.evaluate("()=>({w:!$('#ndWin').hidden, t:$('#ndSketch').textContent, f:['L','dt'].map(k=>!!$('#ndWin [data-dkn='+k+']')), th:$('#ndWin [data-dk=th]').value, res:$('#ndWin [data-dk=res]').value, lv:$('#ndWin [data-dkn=L]').value, dv:$('#ndWin [data-dkn=dt]').value, mats:[...$$('#ndWin [data-dk=mat] option')].map(o=>o.value)})")
+    check('detector window: sketch with the flight path, defaults 25 m / 3 ns / 100 keVee / 20 % resolution at 1 MeVee, four scintillator choices', sk['w'] and '25 m' in sk['t'] and 'diameter D' in sk['t'] and sk['f'] == [True, True] and sk['th'] == '100' and sk['res'] == '20' and sk['lv'] == '25' and sk['dv'] == '3' and sk['mats'] == ['BC501A', 'EJ309', 'STILBENE', 'BC400'], sk)
     check('default detector 10 cm x 10 cm', pg.evaluate("()=>[$('#ndWin [data-dk=D]').value,$('#ndWin [data-dk=T]').value]")==['10','10']); pg.fill('#ndWin [data-dk=N]', '3000'); pg.fill('#ndWin [data-dkn=L]', '12'); pg.wait_for_timeout(200)
     check('sketch follows the inputs', pg.evaluate("()=>/10 cm/.test($('#ndSketch').textContent)&&/12 m/.test($('#ndSketch').textContent)"))
     pg.click('#ndRun'); pg.wait_for_function('ND.eff&&!ND.busy', timeout=120000); pg.wait_for_timeout(500)
@@ -575,7 +575,7 @@ with sync_playwright() as p:
     check('background preview: zoom enables Reset zoom, which clears it', bz == [False, True], bz)
     sj = pg.evaluate("(()=>{const o=JSON.parse(setupJSON()); return [o.codeVersion, o.layerSummary[0]]})()")
     fn = pg.evaluate("setupFileName()")
-    check('setup file name = symbols + thickness + unit + phase per layer, then the code version', fn.endswith('_v0.2.2.setup.json') and '-g_' in fn, fn)
+    check('setup file name = symbols + thickness + unit + phase per layer, then the code version', fn.endswith('_v0.2.24.setup.json') and '-g_' in fn, fn)
     check('setup file lists symbols, thickness, unit, phase (s/l/g) per layer and the code version', sj[0] and sj[1]['symbols'] and sj[1]['thickness'] > 0 and sj[1]['unit'] and sj[1]['phase'] in ('s', 'l', 'g'), sj)
     ex = pg.evaluate("[measCsv(',').split('\\n').filter(l=>l && l[0]!=='#').length, measRootHists().length, measRootHists()[0].name, measCsv(',').indexOf('sigma_syst')>0]")
     check('CSV rows and ROOT histograms per isotope-γ combination', ex[0] == 1 + MEAS.res_n if False else ex[0] > 24 and ex[1] % 8 == 0 and ex[1] > 0 and ex[3], ex)

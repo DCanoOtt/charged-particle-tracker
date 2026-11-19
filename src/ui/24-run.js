@@ -202,7 +202,7 @@ function finishRun(res, pl, secs, partial) {
 }
 function loadSetupText(txt, msg) {
   try {
-    const o = JSON.parse(txt);
+    const o = JSON.parse(String(txt).replace(/\u00b5/g, '\u03bc')); // older setups used the micro sign U+00B5
     if (!o.layers || !o.beam) throw new Error('Not a setup file.');
     if (Array.isArray(o.userMaterials))
       o.userMaterials.forEach(m => {

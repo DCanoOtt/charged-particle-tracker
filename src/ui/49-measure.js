@@ -783,13 +783,13 @@ function measSatNote(R) {
     fmt(rmax, 4) +
     ' counts/s with τ = ' +
     fmt(tau, 3) +
-    ' µs → pile-up loss up to ' +
+    ' μs → pile-up loss up to ' +
     fmt(pmax, 4) +
     ' %' +
     (tauD > 0
       ? ' · DAQ dead time ' +
         fmt(tauD, 3) +
-        ' µs (non-paralysable) → up to ' +
+        ' μs (non-paralysable) → up to ' +
         fmt((100 * rmax * tauD * 1e-6) / (1 + rmax * tauD * 1e-6), 4) +
         ' % of the pulses lost'
       : '') +
@@ -1193,7 +1193,7 @@ function measBuild() {
           ['pps', 'particles / s'],
           ['pA', 'pA'],
           ['nA', 'nA'],
-          ['uA', 'µA'],
+          ['uA', 'μA'],
           ['mA', 'mA']
         ]
           .map(x => '<option value="' + x[0] + '"' + (String(m.IU) === x[0] ? ' selected' : '') + '>' + x[1] + '</option>')

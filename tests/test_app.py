@@ -235,6 +235,15 @@ with sync_playwright() as p:
     pg.fill('#neuCust', '90'); pg.click('#neuAddC'); pg.wait_for_function('NEU.res&&NEU.res.angs.length===3&&NEU.res.angs.includes(90)', timeout=20000); pg.wait_for_timeout(300)
     nd = pg.evaluate("""()=>{const r=NEU.res, i=r.angs.indexOf(90), y=r.ysr(r.cs.ang[i]); return {angs:r.angs, iso:y*4*Math.PI/r.tot4, chk:r.i4/r.tot4, row:$$('#neuRes table.t tr').map(t=>t.textContent).filter(t=>t.startsWith('90'))[0]||'', chips:$$('#neuChips .chip').length}}""")
     check('any angle (90°) is added and interpolated; the isotropic test data give 4π·Y(90°) = total and ∫Y dΩ = total', nd['angs'] == [0, 90, 180] and abs(nd['iso'] - 1) < 0.03 and abs(nd['chk'] - 1) < 0.06 and 'interpolated' in nd['row'] and nd['chips'] == 3, nd)
+    # neutron energy threshold of the emitted neutrons, in eV / keV / MeV
+    t0 = pg.evaluate("()=>({tot:NEU.res.tot4, Eo:NEU.res.Eo, nbo:NEU.res.nbo, m:NEU.res.meanE(NEU.res.cs.tot), units:[...$$('#cNeu [data-nk=emu] option')].map(o=>o.value)})")
+    pg.select_option('#cNeu [data-nk=emu]', 'keV'); pg.fill('#cNeu [data-nk=emin]', '1000'); pg.wait_for_function('neuEmin(neuSet())===1', timeout=20000); pg.wait_for_timeout(1500)
+    t1 = pg.evaluate("()=>{const r=NEU.res, dE=r.Eo/r.nbo; let below=0; for(let j=0;j<r.nbo;j++) if((j+1)*dE<=1) below+=r.cs.tot[j]; return {tot:r.tot4, m:r.meanE(r.cs.tot), below, hint:$('#neuRes .hint').textContent.slice(0,80)}}")
+    pg.select_option('#cNeu [data-nk=emu]', 'MeV'); pg.fill('#cNeu [data-nk=emin]', '0'); pg.wait_for_function('neuEmin(neuSet())===0', timeout=20000); pg.wait_for_timeout(1500)
+    t2 = pg.evaluate("()=>NEU.res.tot4")
+
+    check('neutron energy threshold (1000 keV = 1 MeV): units eV/keV/MeV, no neutron below it, total reduced, mean energy increased, 0 restores the full spectrum',
+          t0['units'] == ['eV', 'keV', 'MeV'] and t1['below'] == 0 and t1['tot'] < t0['tot'] and t1['m'] > t0['m'] and 'energy threshold' in t1['hint'] and abs(t2 / t0['tot'] - 1) < 1e-9, [t0, t1, t2])
     for q, u in [('tot', 'n sr⁻¹ MeV⁻¹'), ('perq', 'n sr⁻¹ μC⁻¹ MeV⁻¹'), ('rate', 'n s⁻¹ sr⁻¹ MeV⁻¹')]:
         pg.select_option('#cNeu [data-nk=qty]', q); pg.wait_for_timeout(800)
         yl = pg.evaluate("()=>NEU.data.n.ylabel+' | '+NEU.data.v.ylabel")
@@ -244,8 +253,10 @@ with sync_playwright() as p:
     check('card spectra are the ideal spectra at the target (no TOF menus, histograms); angular plot is integrated over the neutron energies; folding keeps the integral; 14 MeV needs 488 ns over 25 m', tf['noSel'] and tf['ideal'] and 'integrated' in tf['lab'] and abs(tf['ratio'] - 1) < 1e-9 and 487 < tf['t14'] < 490, tf)
     # neutron detector window: highlighted button, flight path / time resolution moved there, efficiency, detected distribution, pulse-height spectrum
     nb = pg.evaluate("()=>({btn:!!$('#cNeu [data-ndopen].pri'), noL:!$('#cNeu [data-nk=L]'), noDt:!$('#cNeu [data-nk=dt]'), txt:$('#cNeu [data-ndopen]').textContent})")
-    check('"Configure neutron detector" is a highlighted button; flight path and time resolution are no longer in the card', nb['btn'] and nb['noL'] and nb['noDt'] and nb['txt'] == 'Configure neutron detector', nb)
+    check('"Configure n-detector & DAQ" is a highlighted button; flight path and time resolution are no longer in the card', nb['btn'] and nb['noL'] and nb['noDt'] and nb['txt'] == 'Configure n-detector & DAQ', nb)
     pg.click('#cNeu [data-ndopen]'); pg.wait_for_selector('#ndSketch svg')
+    dq = pg.evaluate("()=>({h:$('#ndWin h3').textContent, tau:$('#ndWin [data-dk=tau]').value, pu:$('#ndWin [data-dk=pu]').value})")
+    check('detector window is titled "Configure n-detector & DAQ" and has the DAQ pulse width (100 ns) and the paralysable pile-up model by default', dq['h'] == 'Configure n-detector & DAQ' and dq['tau'] == '100' and dq['pu'] == 'par', dq)
     sk = pg.evaluate("()=>({w:!$('#ndWin').hidden, t:$('#ndSketch').textContent, f:['L','dt'].map(k=>!!$('#ndWin [data-dkn='+k+']')), th:$('#ndWin [data-dk=th]').value, res:$('#ndWin [data-dk=res]').value, lv:$('#ndWin [data-dkn=L]').value, dv:$('#ndWin [data-dkn=dt]').value, mats:[...$$('#ndWin [data-dk=mat] option')].map(o=>o.value)})")
     check('detector window: sketch with the flight path, defaults 25 m / 3 ns / 100 keVee / 20 % resolution at 1 MeVee, four scintillator choices', sk['w'] and '25 m' in sk['t'] and 'diameter D' in sk['t'] and sk['f'] == [True, True] and sk['th'] == '100' and sk['res'] == '20' and sk['lv'] == '25' and sk['dv'] == '3' and sk['mats'] == ['BC501A', 'EJ309', 'STILBENE', 'BC400'], sk)
     check('default detector 10 cm x 10 cm', pg.evaluate("()=>[$('#ndWin [data-dk=D]').value,$('#ndWin [data-dk=T]').value]")==['10','10']); pg.fill('#ndWin [data-dk=N]', '3000'); pg.fill('#ndWin [data-dkn=L]', '12'); pg.wait_for_timeout(200)
@@ -255,6 +266,16 @@ with sync_playwright() as p:
     check('efficiency curve, detected-neutron distribution and pulse-height spectrum are plotted; 10 cm x 10 cm cell: 30-70 % at 2.5 MeV, 15-40 % at 14 MeV', nd2['svg'] == [True, True, True] and nd2['n'] >= 300 and 0.3 < nd2['e25'] < 0.7 and 0.15 < nd2['e14'] < 0.4, nd2)
     rc = pg.evaluate("""()=>{const f=a=>{let t=0; for(let i=0;i<a.y.length;i++){t+=a.y[i]*(a.edges[i+1]-a.edges[i])} return t}; return {svg:!!$('#ndP_r svg'), rec:f(ND.raw.r.series[0]), exp:f(ND.raw.d.series[0]), t:ND.raw.r.title, dbg:(()=>{const P=ND.ph,S=a=>Array.from(a).reduce((x,y)=>x+y,0); let ab=0; P.all.forEach((v,i)=>{if((i+.5)*P.Lmax/P.nb>ND.eff.S.Lth)ab+=v}); const r=NEU.res; return {sw:P.sw,recE:S(P.recE),ab,recT:S(P.recT),L:P.rec,Eo:r.Eo,nbo:r.nbo}})()}}""")
     check('reconstructed energy spectrum from the full-statistics Monte Carlo agrees with the expected detected distribution (15 %)', rc['svg'] and rc['exp'] > 0 and abs(rc['rec'] / rc['exp'] - 1) < 0.15 and 'Reconstructed energy' in rc['t'], rc)
+    # detector file: save / load of the detector and its efficiency curve
+    dj = pg.evaluate("""()=>{
+      const txt=ndToJson(), o=JSON.parse(txt), e0=Array.from(ND.eff.eps), D0=ndSet().D, L0=neuSet().L;
+      const keys=['material','diameter_cm','thickness_cm','density_g_cm3','HC_atom_ratio','threshold_keVee','resolution_FWHM_at_1MeVee_percent','lightOutput','flightPath_m','timeResolution_FWHM_ns'].every(k=>k in o.detector);
+      ndSet().D=3; ndSet().th=777; neuSet().L=5; ND.eff=null;
+      const had=ndFromJson(txt); ndRefreshWin();
+      let bad=null; try{ ndFromJson('{"a":1}') }catch(e){ bad=e.message }
+      return {keys, n:o.efficiency.E_MeV.length, fmt:o.format, had, D:ndSet().D===D0, th:ndSet().th===100, L:neuSet().L===L0, same:ND.eff.eps.length===e0.length&&ND.eff.eps.every((v,i)=>v===e0[i]), fresh:ND.eff.key===ndKey(), plot:!!$('#ndWin svg'), bad, btns:!!$('#ndSaveJson')&&!!$('#ndLoadJson')}}""")
+    check('detector file (JSON): all detector settings and the efficiency curve are saved; loading restores settings and curve (not stale)',
+          dj['keys'] and dj['n'] >= 300 and dj['fmt'] == 'charged-particle-tracker-detector' and dj['had'] and dj['D'] and dj['th'] and dj['L'] and dj['same'] and dj['fresh'] and dj['plot'] and dj['bad'] and dj['btns'], dj)
     check('statistics table: detected neutrons with Monte Carlo uncertainty', pg.evaluate("()=>{const t=$('#ndRes').textContent; return /Detected neutrons \\(above 100 keVee\\)/.test(t)&&/±/.test(t)&&/detected events out of 300000 histories/.test(t)}"))
     pg.select_option('#ndWin [data-dk=dist]', 't'); pg.wait_for_timeout(500)
     check('reconstructed time-of-flight spectrum', pg.evaluate("()=>/time-of-flight/.test(ND.raw.r.title)&&ND.raw.r.series[0].edges.length===241&&ND.raw.r.series[0].y.some(v=>v>0)"))
@@ -274,9 +295,27 @@ with sync_playwright() as p:
     check('neutron card: detected-neutron spectra (spectrum x solid angle x efficiency) whose integral equals the detected total', wd['svg'] and wd['n'] >= 1 and wd['txt'] and wd['tab'] > 0 and abs(wd['tot'] / wd['tab'] - 1) < 0.1, wd)
     pg.wait_for_function("()=>NEU.phc&&NEU.phc.list&&NEU.data.p", timeout=60000)
     cs = pg.evaluate("""()=>{const t=$('#neuStat').textContent, h=$$('#neuRes h3.sub').map(x=>x.textContent), p=NEU.data.p; const f=a=>{let t=0;for(let i=0;i<a.y.length;i++)t+=a.y[i]*(a.edges[i+1]-a.edges[i]);return t};
-      return {h, hasMC:/Monte Carlo/.test(t)&&/statistical/.test(t), rows:$$('#neuStat table.t tr').length, pulse:!!$('#neuP_p svg'), np:p.series.length, bins:/Bins: 200/.test(p.stats[0])&&/integral/.test(p.stats[0]), nbins:/Bins: /.test(NEU.data.n.stats[1])&&/integral/.test(NEU.data.n.stats[1])&&/Bins: /.test(NEU.data.w.stats[0]), ratio:f(p.series[0])/NEU.det.rows[0].tot, tab:$$('#neuStat table.t tr').map(r=>r.textContent.replace(/\s+/g,' ')).join(' | '), phN:NEU.phc.list.map(P=>[P.N,P.nd,P.sw2>0?P.sw*P.sw/P.sw2:0])}}""")
+      return {h, hasMC:/Monte Carlo/.test(t)&&/statistical/.test(t), pileCol:/Pile-up level/.test(t)&&/Count rate after pile-up/.test(t)&&/\\d %/.test(t), rows:$$('#neuStat table.t tr').length, pulse:!!$('#neuP_p svg'), np:p.series.length, bins:/Bins: 200/.test(p.stats[0])&&/integral/.test(p.stats[0]), nbins:/Bins: /.test(NEU.data.n.stats[1])&&/integral/.test(NEU.data.n.stats[1])&&/Bins: /.test(NEU.data.w.stats[0]), ratio:f(p.series[0])/NEU.det.rows[0].tot, tab:$$('#neuStat table.t tr').map(r=>r.textContent.replace(/\s+/g,' ')).join(' | '), phN:NEU.phc.list.map(P=>[P.N,P.nd,P.sw2>0?P.sw*P.sw/P.sw2:0])}}""")
     check('neutron card: Counting statistics table (counts and rate, statistical and Monte Carlo uncertainty), pulse-height spectra below the detected-neutron plot, bins and integrals in the plot info boxes',
-          'Counting statistics' in cs['h'] and cs['hasMC'] and cs['rows'] >= 3 and cs['pulse'] and cs['np'] >= 1 and cs['bins'] and cs['nbins'] and 0.99 < cs['ratio'] < 50, cs)
+          'Counting statistics' in cs['h'] and cs['hasMC'] and cs['pileCol'] and cs['rows'] >= 3 and cs['pulse'] and cs['np'] >= 1 and cs['bins'] and cs['nbins'] and 0.99 < cs['ratio'] < 50, cs)
+    # PPAC with a U-238 target: fission fragments, no pulse height, solid angle of the beam spot, efficiency = fission probability x eta
+    pg.click('#cNeu [data-ndopen]'); pg.wait_for_selector('#ndSketch svg')
+    pg.select_option('#ndWin [data-dk=kind]', 'ppac'); pg.wait_for_timeout(300)
+    pg.fill('#ndWin [data-dk=ptg]', '500'); pg.fill('#ndWin [data-dk=prs]', '1'); pg.fill('#ndWin [data-dk=pN]', '200000')
+    pg.click('#ndRun'); pg.wait_for_function('ND.eff&&!ND.busy&&ND.eff.key===ndKey()&&ND.eff.S.ppac', timeout=120000); pg.wait_for_timeout(1500)
+    pp = pg.evaluate("""()=>{const f=ND.eff, S=f.S, i=f.E.findIndex(e=>e>=14), n=S.n, sg=ppacSigma(f.E[i]);
+      const j=ndToJson(), o=JSON.parse(j);
+      return {sk:/PPAC/.test($('#ndSketch').textContent)&&/U-238/.test($('#ndSketch').textContent), hint:/fission/.test($('#ndHint').textContent), eta:S.eta, E:f.E[i], eps:f.eps[i], expect:S.eta*(1-Math.exp(-n*1e-24*sg)), n,
+        noPh:!$('#ndP_h'), stat:/Detected fission events/.test($('#ndRes').textContent), svg:[!!$('#ndP_e svg'),!!$('#ndP_d svg'),!!$('#ndP_r svg')],
+        card:{noP:!$('#neuP_p'), w:!!$('#neuP_w svg'), spot:/beam spot/.test($('#neuStat').textContent), rows:$$('#neuStat table.t tr').length, title:NEU.data.w.title},
+        om:NEU.det.om, omExp:(L=>2*Math.PI*(1-L/Math.sqrt(L*L+1e-4)))(neuSet().L), json:o.detector.kind==='ppac'&&o.detector.ppac.targetThickness_ug_cm2===500&&o.efficiency.E_MeV.length>100,
+        ratio:(()=>{const P=NEU.phc&&NEU.phc.list&&NEU.phc.list[0]; return P?ndRatio(P):null})()}}""")
+    check('PPAC detector: efficiency = fission probability x eta (U-238 xs), sketch, hint, no pulse-height plots, statistics of the fission events, solid angle of the beam spot, JSON',
+          pp['sk'] and pp['hint'] and 0.1 < pp['eta'] <= 1 and abs(pp['eps'] / pp['expect'] - 1) < 0.05 and pp['noPh'] and pp['stat'] and pp['svg'] == [True, True, True] and pp['card']['noP'] and pp['card']['w']
+          and pp['card']['spot'] and pp['card']['rows'] >= 3 and 'PPAC' in pp['card']['title'] and abs(pp['om'] / pp['omExp'] - 1) < 1e-6 and pp['json'] and pp['ratio'] and pp['ratio']['p'] > 0, pp)
+    pg.select_option('#ndWin [data-dk=kind]', 'scint'); pg.wait_for_timeout(300)
+    pg.click('#ndRun'); pg.wait_for_function('ND.eff&&!ND.busy&&ND.eff.key===ndKey()&&!ND.eff.S.ppac', timeout=120000); pg.wait_for_timeout(500)
+    pg.evaluate("()=>{$('#ndWin').hidden=true}")
     pg.evaluate("()=>{neuSet().L=25; neuSet().dt=3}")
     pg.evaluate("()=>{delete S.neu.ang; neuUpdate()}"); pg.wait_for_timeout(800)
     # alpha file with the neutron production MT201 (a_013-Al-027.dat): merged into MT5, neutron spectrum available
@@ -575,7 +614,7 @@ with sync_playwright() as p:
     check('background preview: zoom enables Reset zoom, which clears it', bz == [False, True], bz)
     sj = pg.evaluate("(()=>{const o=JSON.parse(setupJSON()); return [o.codeVersion, o.layerSummary[0]]})()")
     fn = pg.evaluate("setupFileName()")
-    check('setup file name = symbols + thickness + unit + phase per layer, then the code version', fn.endswith('_v0.2.24.setup.json') and '-g_' in fn, fn)
+    check('setup file name = symbols + thickness + unit + phase per layer, then the code version', fn.endswith('_v0.2.25.setup.json') and '-g_' in fn, fn)
     check('setup file lists symbols, thickness, unit, phase (s/l/g) per layer and the code version', sj[0] and sj[1]['symbols'] and sj[1]['thickness'] > 0 and sj[1]['unit'] and sj[1]['phase'] in ('s', 'l', 'g'), sj)
     ex = pg.evaluate("[measCsv(',').split('\\n').filter(l=>l && l[0]!=='#').length, measRootHists().length, measRootHists()[0].name, measCsv(',').indexOf('sigma_syst')>0]")
     check('CSV rows and ROOT histograms per isotope-γ combination', ex[0] == 1 + MEAS.res_n if False else ex[0] > 24 and ex[1] % 8 == 0 and ex[1] > 0 and ex[3], ex)

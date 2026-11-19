@@ -595,7 +595,76 @@ function ndSmear(L, res, rng) {
     sg = (res * Math.sqrt(L)) / 2.3548;
   return Math.max(0, L + g * sg);
 }
+/* ---- PPAC with a U-238 target: the neutron-induced fission is detected through its two back-to-back fragments ----
+   Efficiency (events / neutrons on the target spot) = [1 - exp(-n sigma_f(E))] x eta, with n the U-238 atoms per cm2 of the layer and eta the probability that the fragments are detected: a Monte Carlo
+   over the point of the fission in the spot (uniform disc of the beam-spot radius) and in depth (uniform in the areal thickness), isotropic back-to-back fragments, escape from the layer when the areal path
+   (t - s)/|cos theta| (forward) or s/|cos theta| (backward) is shorter than the effective range, and impact on the active disc of the PPAC (distance d to the target plane, radius Ra). */
+const ND_NU = (6.02214076e23 * 1e-6) / 238.0508; // U-238 atoms per cm2 and per microgram/cm2
+function ppacSigma(E) {
+  const x = ND_U238.E,
+    y = ND_U238.sf,
+    n = x.length;
+  if (!(E > x[0])) return E > 0 ? y[0] * (E / x[0]) : 0;
+  if (E >= x[n - 1]) return y[n - 1]; // constant above the end of the evaluation
+  let lo = 0,
+    hi = n - 1;
+  while (hi - lo > 1) {
+    const m = (lo + hi) >> 1;
+    if (x[m] > E) hi = m;
+    else lo = m;
+  }
+  return y[lo] + ((y[hi] - y[lo]) * (E - x[lo])) / (x[hi] - x[lo]);
+}
+const ppacProb = (S, E) => 1 - Math.exp(-S.n * 1e-24 * ppacSigma(E));
+function ppacEta(P, N, seed) {
+  const rng = ndRng(seed || 99),
+    both = P.mode !== 'any',
+    pe = P.eff;
+  let hit = 0;
+  for (let h = 0; h < N; h++) {
+    const rr = P.rs * Math.sqrt(rng()),
+      ph = 2 * Math.PI * rng(),
+      x = rr * Math.cos(ph),
+      y = rr * Math.sin(ph),
+      s = rng() * P.tg,
+      c = 2 * rng() - 1,
+      sn = Math.sqrt(1 - c * c),
+      az = 2 * Math.PI * rng(),
+      ca = Math.cos(az),
+      sa = Math.sin(az),
+      lat = c !== 0 ? (P.dist * sn) / Math.abs(c) : Infinity,
+      // fragment A flies along cos theta = c, fragment B opposite
+      one = (cz, sg) => {
+        const path = cz > 0 ? (P.tg - s) / cz : s / -cz;
+        if (!(path < P.range)) return false;
+        const px = x + sg * lat * ca,
+          py = y + sg * lat * sa;
+        return px * px + py * py <= P.rad * P.rad && rng() < pe;
+      },
+      a = one(c, 1),
+      b = one(-c, -1);
+    if (both ? a && b : a || b) hit++;
+  }
+  const eta = hit / N;
+  return { eta, err: Math.sqrt((eta * (1 - eta)) / N) };
+}
+function ppacSetup(det) {
+  const P = { rs: det.prs, tg: det.ptg, range: det.prg, dist: det.pdist, rad: det.prad, eff: Math.min(1, Math.max(0, det.peff / 100)), mode: det.pmode },
+    r = ppacEta(P, Math.max(10000, det.pN | 0), 4711);
+  return {
+    ppac: true,
+    P,
+    n: det.ptg * ND_NU,
+    eta: r.eta,
+    etaErr: r.err,
+    geo: { R: det.prs, T: 0, Ld: det.Lm * 100 },
+    lp: Object.assign({}, ND_LP.liq),
+    Lth: 0,
+    res: 0
+  };
+}
 function ndSetup(det, data) {
+  if (det.kind === 'ppac') return ppacSetup(det);
   const med = ndMedium(det.rho, det.hc, data);
   med.angIso = ND_ISO;
   const lp = Object.assign({}, ND_LP[(ND_MAT[det.mat] || ND_MAT.BC501A).curve], det.lp || {}),
@@ -606,6 +675,14 @@ function ndSetup(det, data) {
 // w > 0: the neutron energy is drawn log-uniformly in E exp(±w), i.e. the efficiency is the average over the energy bin of the curve point
 // (resonances of 12C narrower than the grid would otherwise alias into jagged noise)
 function ndEff(S, E, N, seed, w) {
+  if (S.ppac) {
+    // analytic: fission probability (averaged over the energy window of the curve point) x detection probability of the fragments
+    const ns = w > 0 ? 41 : 1;
+    let p = 0;
+    for (let k = 0; k < ns; k++) p += ppacProb(S, ns > 1 ? E * Math.exp(((2 * (k + 0.5)) / ns - 1) * w) : E);
+    p /= ns;
+    return { eps: S.eta * p, err: S.etaErr * p, eps1: p };
+  }
   const rng = ndRng(seed || 12345),
     E0 = E;
   let sw = 0,
@@ -647,7 +724,43 @@ function ndEfromT(t, Lm) {
 // full-statistics Monte Carlo: energies drawn from the cumulative distribution cdf (over Ecent); returns the pulse-height histogram (nb bins up to Lmax) and, for the events above the
 // threshold, the reconstructed energy (nE bins up to Eo) and time-of-flight (nT bins in [t0, t1]) histograms; the time of flight of the source energy over the flight path Lm
 // is smeared with a Gaussian of sigma st (ns). Weights sum to sw for all histories.
+// PPAC: every history carries the detection probability of its neutron energy as a weight (no event-by-event sampling of the rare fission), so that the reconstructed spectra are smooth
+function ndPulsePpac(S, Ecent, cdf, N, nb, seed, rec) {
+  const rng = ndRng(seed || 777),
+    r = rec || { nE: 1, Eo: 1, nT: 1, t0: 0, t1: 1, Lm: S.geo.Ld / 100, st: 0 },
+    recE = new Float64Array(r.nE),
+    recT = new Float64Array(r.nT);
+  let sd = 0,
+    sd2 = 0,
+    nd = 0;
+  for (let h = 0; h < N; h++) {
+    const u = rng();
+    let lo = 0,
+      hi = cdf.length - 1;
+    while (hi - lo > 1) {
+      const m = (lo + hi) >> 1;
+      if (cdf[m] > u) hi = m;
+      else lo = m;
+    }
+    const En = r.dE > 0 ? Ecent[lo] + (rng() - 0.5) * r.dE : Ecent[lo],
+      w = S.eta * ppacProb(S, En);
+    sd += w;
+    sd2 += w * w;
+    if (w > 0) nd++;
+    if (rec) {
+      const g = r.st > 0 ? Math.sqrt(-2 * Math.log(1 - rng())) * Math.cos(2 * Math.PI * rng()) : 0,
+        t = ndTof(En, r.Lm) + g * r.st,
+        bt = Math.floor(((t - r.t0) / (r.t1 - r.t0)) * r.nT);
+      if (bt >= 0 && bt < r.nT) recT[bt] += w;
+      const Er = t > 0 ? ndEfromT(t, r.Lm) : Infinity,
+        be = Math.floor((Er / r.Eo) * r.nE);
+      if (be >= 0 && be < r.nE) recE[be] += w;
+    }
+  }
+  return { all: new Float64Array(nb), recE, recT, sw: N, sw2: N, sd, sd2, nd, N, ppac: true, relEta: S.eta > 0 ? S.etaErr / S.eta : 0 };
+}
 function ndPulse(S, Ecent, cdf, N, nb, Lmax, seed, rec) {
+  if (S.ppac) return ndPulsePpac(S, Ecent, cdf, N, nb, seed, rec);
   const rng = ndRng(seed || 777),
     all = new Float64Array(nb),
     r = rec || { nE: 1, Eo: 1, nT: 1, t0: 0, t1: 1, Lm: S.geo.Ld / 100, st: 0 },
@@ -692,4 +805,15 @@ function ndPulse(S, Ecent, cdf, N, nb, Lmax, seed, rec) {
     }
   }
   return { all, recE, recT, sw, sw2, sd, sd2, nd, N };
+}
+
+// pile-up of the detected-neutron rate n (s⁻¹) for the pulse width tau (ns):
+//   'par' (paralysable, window ±τ): recorded n·exp(−2nτ), loss 1 − exp(−2nτ)
+//   'non' (non-paralysable, dead time τ): recorded n/(1 + nτ), loss nτ/(1 + nτ)
+//   'off': no loss.   Returns {mu: nτ, loss, rec}
+function ndPile(n, tauNs, mode) {
+  const mu = Math.max(n, 0) * Math.max(+tauNs || 0, 0) * 1e-9;
+  if (mode === 'off') return { mu, loss: 0, rec: Math.max(n, 0) };
+  const loss = mode === 'non' ? mu / (1 + mu) : 1 - Math.exp(-2 * mu);
+  return { mu, loss, rec: Math.max(n, 0) * (1 - loss) };
 }

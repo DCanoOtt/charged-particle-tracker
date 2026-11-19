@@ -1,10 +1,21 @@
-/* ====== Neutron detector: window "Configure neutron detector" (geometry sketch, parameters, efficiency, detected distribution, pulse-height spectrum) ====== */
+/* ====== Neutron detector: window "Configure n-detector & DAQ" (geometry sketch, parameters, efficiency, detected distribution, pulse-height spectrum) ====== */
 const ND_DEF = {
+  kind: 'scint',
+  ptg: 298,
+  prs: 2,
+  prg: 10000,
+  pdist: 2.5,
+  prad: 5,
+  peff: 100,
+  pmode: 'any',
+  pN: 500000,
   mat: 'BC501A',
   D: 10,
   T: 10,
   th: 100,
   res: 20,
+  tau: 100,
+  pu: 'par',
   N: 20000,
   Emax: 200,
   Ew: 2,
@@ -44,15 +55,103 @@ function ndSet() {
   }
   return o;
 }
+// short description of the configured detector (titles of the plots)
+function ndLabel() {
+  const d = ndSet();
+  return d.kind === 'ppac'
+    ? 'PPAC · U-238 ' + d.ptg + ' μg/cm² · spot Ø' + 2 * d.prs + ' cm · ' + (d.pmode === 'any' ? 'one fragment' : 'both fragments')
+    : ND_MAT[d.mat].name + ' Ø' + d.D + ' × ' + d.T + ' cm';
+}
 const ndLpAll = d => Object.assign({}, ND_LP[(ND_MAT[d.mat] || ND_MAT.BC501A).curve], d.lpo || {});
 function ndDet() {
   const d = ndSet(),
     s = neuSet();
-  return { mat: d.mat, D: +d.D, T: +d.T, th: +d.th, res: +d.res, rho: +d.rho, hc: +d.hc, lp: ndLpAll(d), Lm: +s.L > 0 ? +s.L : 25 };
+  return {
+    kind: d.kind,
+    ptg: +d.ptg,
+    prs: +d.prs,
+    prg: +d.prg,
+    pdist: +d.pdist,
+    prad: +d.prad,
+    peff: +d.peff,
+    pmode: d.pmode,
+    pN: +d.pN,
+    mat: d.mat,
+    D: +d.D,
+    T: +d.T,
+    th: +d.th,
+    res: +d.res,
+    rho: +d.rho,
+    hc: +d.hc,
+    lp: ndLpAll(d),
+    Lm: +s.L > 0 ? +s.L : 25
+  };
 }
 
 // side view of the point source and the cylindrical detector, labelled with the current values
+function ppacSketch() {
+  const d = ndSet(),
+    s = neuSet(),
+    T = (x, y, t, a, c) =>
+      '<text x="' + x + '" y="' + y + '" text-anchor="' + (a || 'middle') + '" font-size="11.5" fill="' + (c || 'var(--ink)') + '">' + t + '</text>',
+    dimv = (x, y0, y1, lab, val) =>
+      '<line x1="' +
+      x +
+      '" y1="' +
+      y0 +
+      '" x2="' +
+      x +
+      '" y2="' +
+      y1 +
+      '" stroke="var(--accent)" stroke-width="1.4" marker-start="url(#nda)" marker-end="url(#nda)"/>' +
+      T(x + 8, (y0 + y1) / 2 - 2, lab, 'start') +
+      T(x + 8, (y0 + y1) / 2 + 13, val, 'start', 'var(--ink2)'),
+    dimh = (x0, x1, y, lab, val) =>
+      '<line x1="' +
+      x0 +
+      '" y1="' +
+      y +
+      '" x2="' +
+      x1 +
+      '" y2="' +
+      y +
+      '" stroke="var(--accent)" stroke-width="1.4" marker-start="url(#nda)" marker-end="url(#nda)"/>' +
+      T((x0 + x1) / 2, y + 15, lab) +
+      T((x0 + x1) / 2, y + 28, val, 'middle', 'var(--ink2)');
+  return (
+    '<svg viewBox="0 0 660 300" role="img" aria-label="Geometry of the PPAC detector with the U-238 target" style="width:100%;max-width:660px;display:block;margin:4px auto 0">' +
+    '<defs><marker id="nda" viewBox="0 0 8 8" refX="4" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L8 4 L0 8 z" fill="var(--accent)"/></marker></defs>' +
+    '<line x1="20" y1="140" x2="640" y2="140" stroke="var(--ink2)" stroke-width="1" stroke-dasharray="8 4 2 4"/>' +
+    '<circle cx="40" cy="140" r="5" fill="var(--bad, #c0392b)"/>' +
+    T(40, 125, 'point source') +
+    '<line x1="48" y1="140" x2="318" y2="140" stroke="var(--bad, #c0392b)" stroke-width="2.4" marker-end="url(#nda)"/>' +
+    T(12, 163, 'neutrons from the target', 'start', 'var(--ink2)') +
+    '<rect x="326" y="104" width="8" height="72" fill="var(--accent)" stroke="var(--accent)"/>' +
+    T(330, 96, 'U-238 deposit') +
+    '<rect x="168" y="50" width="6" height="180" fill="var(--accent-soft, rgba(60,140,160,.35))" stroke="var(--accent)" stroke-width="1.4"/>' +
+    '<rect x="486" y="50" width="6" height="180" fill="var(--accent-soft, rgba(60,140,160,.35))" stroke="var(--accent)" stroke-width="1.4"/>' +
+    T(171, 42, 'PPAC') +
+    T(489, 42, 'PPAC') +
+    '<line x1="330" y1="140" x2="176" y2="82" stroke="var(--ink2)" stroke-width="1.4" marker-end="url(#nda)"/>' +
+    '<line x1="330" y1="140" x2="486" y2="198" stroke="var(--ink2)" stroke-width="1.4" marker-end="url(#nda)"/>' +
+    T(250, 100, 'fragment', 'middle', 'var(--ink2)') +
+    T(412, 196, 'fragment', 'middle', 'var(--ink2)') +
+    dimv(560, 50, 230, 'active Ø', 2 * d.prad + ' cm') +
+    dimv(240, 104, 176, 'spot Ø', 2 * d.prs + ' cm') +
+    dimh(171, 330, 258, 'distance to the target', +d.pdist + ' cm') +
+    dimh(40, 330, 280, 'flight path L (source – target)', +s.L + ' m') +
+    T(
+      330,
+      14,
+      'U-238 ' + d.ptg + ' μg/cm² · fragment range ' + d.prg + ' μg/cm² · the two back-to-back fragments leave the layer in opposite directions',
+      'middle',
+      'var(--ink2)'
+    ) +
+    '</svg>'
+  );
+}
 function ndSketch() {
+  if (ndSet().kind === 'ppac') return ppacSketch();
   const d = ndSet(),
     s = neuSet(),
     T = (x, y, t, a, c) =>
@@ -96,6 +195,73 @@ function ndSketch() {
   );
 }
 function ndInputs() {
+  const d = ndSet();
+  return (
+    '<div class="row3"><label class="fld"><span>Detector type</span><select data-dk="kind"><option value="scint"' +
+    (d.kind !== 'ppac' ? ' selected' : '') +
+    '>Organic scintillator (recoil protons)</option><option value="ppac"' +
+    (d.kind === 'ppac' ? ' selected' : '') +
+    '>PPAC with a U-238 target (fission fragments)</option></select></label></div>' +
+    (d.kind === 'ppac' ? ndInputsPpac() : ndInputsScint())
+  );
+}
+// DAQ: pulse width and pile-up model (do not change the efficiency, only the counting-statistics table)
+function ndInputsDaq() {
+  const d = ndSet(),
+    nI = (a, k, v, ex) => '<input type="number" ' + a + '="' + k + '" step="any" ' + (ex || '') + ' value="' + v + '">',
+    fld = (l, h) => '<label class="fld"><span>' + l + '</span>' + h + '</label>';
+  return (
+    '<h4>DAQ: pulse width and pile-up</h4><div class="row3">' +
+    fld('Pulse width / resolving time τ (ns)', nI('data-dk', 'tau', d.tau, 'min="0"')) +
+    fld(
+      'Pile-up model',
+      '<select data-dk="pu"><option value="par"' +
+        (d.pu === 'par' ? ' selected' : '') +
+        '>paralysable: events within ±τ pile up, N·exp(−2nτ) survive</option><option value="non"' +
+        (d.pu === 'non' ? ' selected' : '') +
+        '>non-paralysable: dead time τ after each event, n/(1+nτ)</option><option value="off"' +
+        (d.pu === 'off' ? ' selected' : '') +
+        '>none</option></select>'
+    ) +
+    '</div><p class="hint">The pile-up level is shown in the table <i>Counting statistics</i> of the card <i>Neutron counting</i> (column <i>Pile-up level</i>): the fraction of the events lost or distorted at the rate n of detected neutrons.</p>'
+  );
+}
+function ndInputsPpac() {
+  const d = ndSet(),
+    s = neuSet(),
+    nI = (a, k, v, ex) => '<input type="number" ' + a + '="' + k + '" step="any" ' + (ex || '') + ' value="' + v + '">',
+    fld = (l, h) => '<label class="fld"><span>' + l + '</span>' + h + '</label>';
+  return (
+    '<div class="row3">' +
+    fld('U-238 target thickness (μg/cm²)', nI('data-dk', 'ptg', d.ptg, 'min="0.001"')) +
+    fld('Beam spot radius = radius of the U-238 deposit (cm)', nI('data-dk', 'prs', d.prs, 'min="0.01"')) +
+    fld('Effective range of the fragments in U-238 (μg/cm²)', nI('data-dk', 'prg', d.prg, 'min="1"')) +
+    '</div><div class="row3">' +
+    fld('Distance of each PPAC to the target (cm)', nI('data-dk', 'pdist', d.pdist, 'min="0.1"')) +
+    fld('Active radius of the PPAC (cm)', nI('data-dk', 'prad', d.prad, 'min="0.1"')) +
+    fld('PPAC efficiency per fragment (%)', nI('data-dk', 'peff', d.peff, 'min="0" max="100"')) +
+    '</div><div class="row3">' +
+    fld(
+      'Fission event detected when',
+      '<select data-dk="pmode"><option value="both"' +
+        (d.pmode !== 'any' ? ' selected' : '') +
+        '>both fragments are detected (coincidence)</option><option value="any"' +
+        (d.pmode === 'any' ? ' selected' : '') +
+        '>at least one fragment is detected</option></select>'
+    ) +
+    fld('Flight path L (m) — source to the target', nI('data-dkn', 'L', s.L, 'min="0.01"')) +
+    fld('Time resolution, FWHM (ns)', nI('data-dkn', 'dt', s.dt, 'min="0"')) +
+    '</div><div class="row3">' +
+    fld('Histories of the fragment Monte Carlo', nI('data-dk', 'pN', d.pN, 'min="10000" step="10000"')) +
+    fld('Largest neutron energy of the efficiency curve (MeV)', nI('data-dk', 'Emax', d.Emax, 'min="1" max="250"')) +
+    fld('Energy averaging of the efficiency curve (± %; 0 = point values)', nI('data-dk', 'Ew', d.Ew, 'min="0" max="50"')) +
+    '</div><div class="row3">' +
+    fld('Histories per angle (reconstructed spectrum, counting statistics)', nI('data-dk', 'Nph', d.Nph, 'min="10000" max="5000000" step="10000"')) +
+    '</div>' +
+    ndInputsDaq()
+  );
+}
+function ndInputsScint() {
   const d = ndSet(),
     s = neuSet(),
     lp = ndLpAll(d),
@@ -131,6 +297,7 @@ function ndInputs() {
     ) +
     fld('Energy averaging of the efficiency curve (± %; 0 = point values)', nI('data-dk', 'Ew', d.Ew, 'min="0" max="50"')) +
     '</div>' +
+    ndInputsDaq() +
     '<details class="cw"><summary>Light-output curves (NRESP type, editable)</summary><p class="hint">Protons: L<sub>p</sub>(E) = a1·E − a2·[1 − exp(−a3·E<sup>a4</sup>)] (MeVee; Cecil et al. for the NE-213 type liquids, Madey / Verbinski for the plastic). Alphas: L<sub>α</sub> = kα·E<sup>kb</sup>. Carbon recoils: L<sub>C</sub> = c·E<sup>cb</sup>. Electrons are linear (1 MeVee = 1 MeV of electron energy).</p><div class="row3">' +
     [
       ['a1', 'a1'],
@@ -151,6 +318,14 @@ function ndInputs() {
 }
 function ndDataStatus() {
   const D = ND.data;
+  if (ndSet().kind === 'ppac')
+    return (
+      'Fission cross section (embedded): <b>' +
+      esc(ND_U238.name) +
+      '</b> (n+²³⁸U, MT 18) of the JENDL-5 library at 300 K, up to ' +
+      fmt(ND_U238.Emax, 4) +
+      ' MeV; constant above.'
+    );
   return (
     'Cross sections and angular distributions (embedded): <b>' +
     esc(D.nH) +
@@ -161,11 +336,18 @@ function ndDataStatus() {
     ' reaction channels, lumped above 20 MeV), ACE files of the ENDF/B-VIII.0 library (lib80x) at room temperature, 293.6 K.'
   );
 }
+function ndHint() {
+  return ndSet().kind === 'ppac'
+    ? 'Parallel-plate avalanche counters (PPAC) on both sides of a thin U-238 deposit on the beam axis; the neutrons of the “Neutron counting” card come from a point source at the flight-path distance. A neutron-induced fission (JENDL-5 U-238, MT 18, up to 195 MeV) emits two back-to-back fragments; each one leaves the layer if its path (t − s)/|cos θ| (forward) or s/|cos θ| (backward) from the depth s of the fission is shorter than the effective range, and is detected when it hits the active disc of its PPAC. The efficiency is [1 − exp(−n σ<sub>f</sub>(E))] × η, with n the U-238 atoms per cm² and η the detection probability of the fragments (Monte Carlo over the position in the beam spot, the depth and the isotropic direction). The solid angle of the detector is that of the beam spot seen from the source. There is no pulse height.'
+    : 'Cylindrical organic scintillator on the beam axis; the neutrons of the “Neutron counting” card come from a point source at the flight-path distance. The efficiency is a Monte Carlo of the neutron transport in the cell (multiple scattering included): ¹H(n,n), ¹²C(n,n), the ¹²C inelastic, (n,α), (n,p) and 3α break-up channels of the library (lumped above 20 MeV); the light of every recoil particle is added, smeared with the energy resolution of the scintillator (Gaussian, FWHM/L = resolution at 1 MeVee divided by √(L/MeVee); 0 = ideal), and an event counts when the smeared light exceeds the threshold.';
+}
 function ndBuild() {
   const w = $('#ndWin');
   w.innerHTML =
-    '<div class="mbox" style="width:min(1100px,100%)"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;position:sticky;top:-18px;z-index:5;background:var(--panel);padding:4px 0"><h3>Configure neutron detector</h3><button class="btn pri" data-ndclose id="ndDoneTop">Done</button></div>' +
-    '<p class="hint">Cylindrical organic scintillator on the beam axis; the neutrons of the “Neutron counting” card come from a point source at the flight-path distance. The efficiency is a Monte Carlo of the neutron transport in the cell (multiple scattering included): ¹H(n,n), ¹²C(n,n), the ¹²C inelastic, (n,α), (n,p) and 3α break-up channels of the library (lumped above 20 MeV); the light of every recoil particle is added, smeared with the energy resolution of the scintillator (Gaussian, FWHM/L = resolution at 1 MeVee divided by √(L/MeVee); 0 = ideal), and an event counts when the smeared light exceeds the threshold.</p>' +
+    '<div class="mbox" style="width:min(1100px,100%)"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;position:sticky;top:-18px;z-index:5;background:var(--panel);padding:4px 0"><h3>Configure n-detector &amp; DAQ</h3><button class="btn pri" data-ndclose id="ndDoneTop">Done</button></div>' +
+    '<p class="hint" id="ndHint">' +
+    ndHint() +
+    '</p>' +
     '<div id="ndSketch">' +
     ndSketch() +
     '</div>' +
@@ -173,7 +355,7 @@ function ndBuild() {
     ndInputs() +
     '</div>' +
     '<p class="hint" id="ndDataLbl"></p>' +
-    '<div class="btns"><button class="btn pri" id="ndRun">Calculate efficiency</button><button class="btn" data-ndclose>Done</button><span class="hint" id="ndMsg"></span></div>' +
+    '<div class="btns"><button class="btn pri" id="ndRun">Calculate efficiency</button><button class="btn" id="ndSaveJson" title="Save the detector (all its settings and the efficiency curve) as a JSON file">Save detector (JSON)</button><button class="btn" id="ndLoadJson" title="Load a detector JSON file">Load detector (JSON)</button><input type="file" id="ndLoadFile" accept=".json,application/json" hidden><button class="btn" data-ndclose>Done</button><span class="hint" id="ndMsg"></span></div>' +
     '<div id="ndRes"></div></div>';
   $('#ndDataLbl').innerHTML = ndDataStatus();
   ndShow();
@@ -220,6 +402,130 @@ async function ndCalc() {
   ND.eff = { E, eps, err, e1, key: ndKey(), S };
   ND.busy = false;
   if (msg) msg.textContent = '';
+  ndShow();
+  if (NEU.res) neuShow();
+}
+// detector file: every setting of the detector (geometry, material and its light-output curves, threshold, resolution, flight path, time resolution, Monte Carlo settings), the data it was computed with and the efficiency curve
+function ndToJson() {
+  const d = ndSet(),
+    s = neuSet(),
+    m = ND_MAT[d.mat] || ND_MAT.BC501A,
+    f = ND.eff && ND.eff.key === ndKey() ? ND.eff : null;
+  return JSON.stringify(
+    {
+      format: 'charged-particle-tracker-detector',
+      version: typeof APP_VERSION === 'string' ? APP_VERSION : '',
+      saved: new Date().toISOString(),
+      detector: {
+        type: d.kind === 'ppac' ? 'PPAC with a U-238 target' : 'organic scintillator',
+        kind: d.kind === 'ppac' ? 'ppac' : 'scint',
+        ppac:
+          d.kind === 'ppac'
+            ? {
+                targetThickness_ug_cm2: +d.ptg,
+                beamSpotRadius_cm: +d.prs,
+                fragmentEffectiveRange_ug_cm2: +d.prg,
+                ppacDistance_cm: +d.pdist,
+                ppacActiveRadius_cm: +d.prad,
+                ppacEfficiencyPerFragment_percent: +d.peff,
+                detectionCondition: d.pmode,
+                fragmentHistories: +d.pN,
+                crossSection: typeof ND_U238 === 'object' ? 'ENDF/B-VIII.0 U-238 (n,f), ' + ND_U238.name : ''
+              }
+            : null,
+        material: d.mat,
+        materialName: m.name,
+        diameter_cm: +d.D,
+        thickness_cm: +d.T,
+        density_g_cm3: +d.rho,
+        HC_atom_ratio: +d.hc,
+        threshold_keVee: +d.th,
+        resolution_FWHM_at_1MeVee_percent: +d.res,
+        lightOutput: ndLpAll(d),
+        lightOutputOverrides: d.lpo || {},
+        flightPath_m: +s.L > 0 ? +s.L : 25,
+        timeResolution_FWHM_ns: +s.dt
+      },
+      daq: { pulseWidth_ns: +d.tau, pileUpModel: d.pu },
+      monteCarlo: { historiesPerEnergy: +d.N, EmaxEfficiency_MeV: +d.Emax, energyAveraging_percent: +d.Ew, historiesPulseHeight: +d.Nph },
+      crossSectionData: {
+        H: (ND.data.H || {}).nMt,
+        C: (ND.data.C || {}).nMt,
+        nH: ND.data.nH,
+        nC: ND.data.nC,
+        source: 'embedded ACE (lib80x, room temperature) for 1H and 12C'
+      },
+      efficiency: f ? { E_MeV: Array.from(f.E), intrinsic: Array.from(f.eps), error: Array.from(f.err), singleCollision: Array.from(f.e1) } : null,
+      settings: { dist: d.dist, ia: d.ia }
+    },
+    null,
+    1
+  );
+}
+function ndFromJson(txt) {
+  const o = JSON.parse(txt);
+  if (!o || o.format !== 'charged-particle-tracker-detector' || !o.detector) throw new Error('not a detector file');
+  const dt = o.detector,
+    d = ndSet(),
+    s = neuSet(),
+    num = (v, def) => (Number.isFinite(+v) && v !== null && v !== '' ? +v : def);
+  d.kind = dt.kind === 'ppac' ? 'ppac' : 'scint';
+  if (d.kind === 'ppac' && dt.ppac) {
+    const p = dt.ppac;
+    d.ptg = num(p.targetThickness_ug_cm2, d.ptg);
+    d.prs = num(p.beamSpotRadius_cm, d.prs);
+    d.prg = num(p.fragmentEffectiveRange_ug_cm2, d.prg);
+    d.pdist = num(p.ppacDistance_cm, d.pdist);
+    d.prad = num(p.ppacActiveRadius_cm, d.prad);
+    d.peff = num(p.ppacEfficiencyPerFragment_percent, d.peff);
+    d.pmode = p.detectionCondition === 'any' ? 'any' : 'both';
+    d.pN = num(p.fragmentHistories, d.pN);
+  }
+  d.mat = ND_MAT[dt.material] ? dt.material : 'BC501A';
+  d.D = num(dt.diameter_cm, d.D);
+  d.T = num(dt.thickness_cm, d.T);
+  d.rho = num(dt.density_g_cm3, ND_MAT[d.mat].rho);
+  d.hc = num(dt.HC_atom_ratio, ND_MAT[d.mat].hc);
+  d.th = num(dt.threshold_keVee, d.th);
+  d.res = num(dt.resolution_FWHM_at_1MeVee_percent, d.res);
+  d.lpo = dt.lightOutputOverrides && typeof dt.lightOutputOverrides === 'object' ? dt.lightOutputOverrides : {};
+  s.L = num(dt.flightPath_m, s.L);
+  s.dt = num(dt.timeResolution_FWHM_ns, s.dt);
+  const dq = o.daq || {};
+  d.tau = num(dq.pulseWidth_ns, d.tau);
+  d.pu = dq.pileUpModel === 'non' || dq.pileUpModel === 'off' ? dq.pileUpModel : 'par';
+  const mc = o.monteCarlo || {};
+  d.N = num(mc.historiesPerEnergy, d.N);
+  d.Emax = num(mc.EmaxEfficiency_MeV, d.Emax);
+  d.Ew = num(mc.energyAveraging_percent, d.Ew);
+  d.Nph = num(mc.historiesPulseHeight, d.Nph);
+  const e = o.efficiency;
+  ND.ph = null;
+  ND.eff = null;
+  if (e && Array.isArray(e.E_MeV) && Array.isArray(e.intrinsic) && e.E_MeV.length === e.intrinsic.length && e.E_MeV.length > 2) {
+    const n = e.E_MeV.length,
+      arr = (a, fb) => (Array.isArray(a) && a.length === n ? Float64Array.from(a) : new Float64Array(n).fill(fb));
+    ND.eff = {
+      E: Float64Array.from(e.E_MeV),
+      eps: Float64Array.from(e.intrinsic),
+      err: arr(e.error, 0),
+      e1: arr(e.singleCollision, 0),
+      key: ndKey(),
+      S: ndSetup(ndDet(), ND.data)
+    };
+  }
+  saveLocal();
+  return !!ND.eff;
+}
+function ndRefreshWin() {
+  const a = $('#ndIn'),
+    k = $('#ndSketch'),
+    h = $('#ndHint'),
+    l = $('#ndDataLbl');
+  if (a) a.innerHTML = ndInputs();
+  if (k) k.innerHTML = ndSketch();
+  if (h) h.innerHTML = ndHint();
+  if (l) l.innerHTML = ndDataStatus();
   ndShow();
   if (NEU.res) neuShow();
 }
@@ -283,9 +589,31 @@ function ndPhRun(S, Y, r, Lp, st, N, seed, LmaxIn) {
     nb = 200,
     rec = { nE: r.nbo, Eo: r.Eo, nT: 240, Lm: Lp, st, dE, t0: ndTof((eLast + 1) * dE, Lp) - 4 * st, t1: ndTof(Math.max(0.2, eFirst * dE), Lp) + 4 * st },
     pr = ndPulse(S, Ec, cdf, N, nb, Lmax, seed, rec);
-  return { Lmax, nb, all: pr.all, sw: pr.sw, recE: pr.recE, recT: pr.recT, rec, sw2: pr.sw2, sd: pr.sd, sd2: pr.sd2, nd: pr.nd, N: pr.N, Lth: S.Lth };
+  return {
+    ppac: !!pr.ppac,
+    relEta: pr.relEta || 0,
+    Lmax,
+    nb,
+    all: pr.all,
+    sw: pr.sw,
+    recE: pr.recE,
+    recT: pr.recT,
+    rec,
+    sw2: pr.sw2,
+    sd: pr.sd,
+    sd2: pr.sd2,
+    nd: pr.nd,
+    N: pr.N,
+    Lth: S.Lth
+  };
 }
 const ndRatio = P => {
+  if (P.ppac) {
+    // weights = detection probability of each history: mean p, standard error of the mean, plus the relative error of eta (fragment Monte Carlo)
+    const p = P.sw > 0 ? P.sd / P.sw : 0,
+      v = P.sw > 0 ? Math.max(0, P.sd2 - 2 * p * P.sd + p * p * P.sw) / (P.sw * P.sw) : 0;
+    return { p, sp: Math.sqrt(v + Math.pow(p * (P.relEta || 0), 2)) };
+  }
   const p = P.sw > 0 ? P.sd / P.sw : 0,
     v = P.sw > 0 ? Math.max(0, P.sd2 * (1 - 2 * p) + p * p * P.sw2) / (P.sw * P.sw) : 0;
   return { p, sp: Math.sqrt(v) };
@@ -309,22 +637,50 @@ function ndShow() {
   const nz = f.E.map((e, i) => i).filter(i => f.eps[i] > 0);
   ND.raw.e = {
     series: [
-      { name: 'Monte Carlo (all collisions)', type: 'line', x: nz.map(i => f.E[i]), y: nz.map(i => f.eps[i]), color: scol(0), w: 2 },
-      { name: 'single ¹H(n,n) collision (analytic)', type: 'line', x: nz.map(i => f.E[i]), y: nz.map(i => f.e1[i]), color: scol(3), w: 1.5 }
+      {
+        name: d.kind === 'ppac' ? 'efficiency = fission probability × η' : 'Monte Carlo (all collisions)',
+        type: 'line',
+        x: nz.map(i => f.E[i]),
+        y: nz.map(i => f.eps[i]),
+        color: scol(0),
+        w: 2
+      },
+      {
+        name: d.kind === 'ppac' ? 'fission probability in the layer (η = 1)' : 'single ¹H(n,n) collision (analytic)',
+        type: 'line',
+        x: nz.map(i => f.E[i]),
+        y: nz.map(i => f.e1[i]),
+        color: scol(3),
+        w: 1.5
+      }
     ],
     xlabel: 'Neutron energy (MeV)',
-    ylabel: 'Efficiency (events above threshold / neutrons on the face)',
-    title:
-      'Detector efficiency · ' + ND_MAT[d.mat].name + ' Ø' + d.D + ' × ' + d.T + ' cm · threshold ' + d.th + ' keVee · resolution ' + d.res + ' % at 1 MeVee',
+    ylabel: d.kind === 'ppac' ? 'Efficiency (detected fissions / neutrons on the target spot)' : 'Efficiency (events above threshold / neutrons on the face)',
+    title: 'Detector efficiency · ' + (d.kind === 'ppac' ? ndLabel() : ndLabel() + ' · threshold ' + d.th + ' keVee · resolution ' + d.res + ' % at 1 MeVee'),
     stats: [
-      'L = ' +
-        neuSet().L +
-        ' m (point source on the axis) · statistical error of the Monte Carlo: ≤ ' +
-        fmt(Math.max(...f.err), 2) +
-        ' (1σ) · ' +
-        (d.Ew > 0
-          ? 'averaged over ± ' + d.Ew + ' % in neutron energy at each point (smooths the resonance structure of ¹²C)'
-          : 'point values, no energy averaging')
+      d.kind === 'ppac'
+        ? 'L = ' +
+          neuSet().L +
+          ' m · fragment detection probability η = ' +
+          fmt(f.S.eta, 4) +
+          ' ± ' +
+          fmt(f.S.etaErr, 2) +
+          ' (Monte Carlo, ' +
+          d.pN +
+          ' histories, ' +
+          (d.pmode === 'any' ? 'at least one fragment' : 'both fragments') +
+          ') · n = ' +
+          fmt(f.S.n, 4) +
+          ' U-238 atoms/cm² · ' +
+          (d.Ew > 0 ? 'averaged over ± ' + d.Ew + ' % in neutron energy at each point' : 'point values, no energy averaging')
+        : 'L = ' +
+          neuSet().L +
+          ' m (point source on the axis) · statistical error of the Monte Carlo: ≤ ' +
+          fmt(Math.max(...f.err), 2) +
+          ' (1σ) · ' +
+          (d.Ew > 0
+            ? 'averaged over ± ' + d.Ew + ' % in neutron energy at each point (smooths the resonance structure of ¹²C)'
+            : 'point values, no energy averaging')
     ]
   };
   let html = stale ? '<p class="warn">The parameters changed since the last calculation — press <b>Calculate efficiency</b> to update the plots.</p>' : '';
@@ -342,7 +698,7 @@ function ndShow() {
     om = 2 * Math.PI * (1 - Lm / Math.sqrt(Lm * Lm + Rr * Rr)),
     sc = r.sc[q.f],
     dE = r.Eo / r.nbo,
-    Y = r.cs.ang[ia],
+    Y = r.csAll.ang[ia], // the energy threshold of the Neutron counting card does not apply in this window
     Lp = +s.L > 0 ? +s.L : 25,
     st = Math.max(0, +s.dt || 0) / 2.3548,
     fold = st > 0,
@@ -389,7 +745,7 @@ function ndShow() {
   for (let j = 0; j < r.nbo; j++) acc += Y[j];
   const Ytot = acc * dE,
     ntot = Ytot * sc * om;
-  const key = [f.key, ia, r.cs.W, r.Eo, s.L, s.dt, d.Nph].join('|');
+  const key = [f.key, ia, r.csAll.W, r.Eo, s.L, s.dt, d.Nph].join('|');
   if (!ND.ph || ND.ph.key !== key) ND.ph = { key, ...ndPhRun(f.S, Y, r, Lp, st, Math.max(10000, +d.Nph || 300000), 4242) };
   const P = ND.ph,
     dL = P.Lmax / P.nb,
@@ -400,9 +756,9 @@ function ndShow() {
   let nAbove = 0;
   phThr.forEach(v => (nAbove += v * dL));
   // statistics of the detected neutrons: ratio estimator p = Σw_det / Σw of the Monte Carlo (weights = solid-angle weights of the entry points)
-  const pe = P.sw > 0 ? P.sd / P.sw : 0,
-    vp = P.sw > 0 ? Math.max(0, P.sd2 * (1 - 2 * pe) + pe * pe * P.sw2) / (P.sw * P.sw) : 0,
-    sp = Math.sqrt(vp),
+  const Rt = ndRatio(P),
+    pe = Rt.p,
+    sp = Rt.sp,
     nDet = ntot * pe,
     sDet = ntot * sp,
     expInt = (() => {
@@ -471,9 +827,9 @@ function ndShow() {
     ' ' +
     esc(uq.replace('counts', 'n')) +
     '</td></tr>' +
-    '<tr><td><b>Detected neutrons (above ' +
-    d.th +
-    ' keVee)</b></td><td><b>' +
+    '<tr><td><b>' +
+    (d.kind === 'ppac' ? 'Detected fission events' : 'Detected neutrons (above ' + d.th + ' keVee)') +
+    '</b></td><td><b>' +
     fmt(nDet, 5) +
     ' ± ' +
     fmt(sDet, 2) +
@@ -488,12 +844,18 @@ function ndShow() {
     fmt(sp, 2) +
     '</td></tr>' +
     '<tr><td>Monte Carlo</td><td>' +
-    P.nd +
-    ' detected events out of ' +
-    P.N +
-    ' histories (N_eff = ' +
-    fmt((P.sw * P.sw) / (P.sw2 || 1), 5) +
-    ')</td></tr>' +
+    (d.kind === 'ppac'
+      ? 'η = ' +
+        fmt(f.S.eta, 4) +
+        ' ± ' +
+        fmt(f.S.etaErr, 2) +
+        ' from ' +
+        d.pN +
+        ' fragment histories; neutron energies drawn ' +
+        P.N +
+        ' times from the spectrum (weights = detection probability)'
+      : P.nd + ' detected events out of ' + P.N + ' histories (N_eff = ' + fmt((P.sw * P.sw) / (P.sw2 || 1), 5) + ')') +
+    '</td></tr>' +
     '<tr><td>Same number from the efficiency curve (expected distribution)</td><td>' +
     fmt(expInt, 5) +
     ' ' +
@@ -517,12 +879,12 @@ function ndShow() {
     esc(q.t) +
     '); counts = neutron spectrum × solid angle × efficiency(E), time resolution folded in. The next plot is the same distribution reconstructed event by event.</span></div><div id="ndP_d"></div>' +
     '<h3 class="sub">Reconstructed energy / time-of-flight spectrum</h3><div id="ndP_r"></div>' +
-    '<h3 class="sub">Pulse-height spectrum in the detector</h3><div id="ndP_h"></div>';
+    (d.kind === 'ppac' ? '' : '<h3 class="sub">Pulse-height spectrum in the detector</h3><div id="ndP_h"></div>');
   box.innerHTML = html;
   ndPlot('e');
   ndPlot('d');
   ndPlot('r');
-  ndPlot('h');
+  if (d.kind !== 'ppac') ndPlot('h');
 }
 function ndOpts(k) {
   const d = ND.raw[k],
@@ -674,6 +1036,16 @@ document.addEventListener('click', ev => {
   }
   if (!w) return;
   if (ev.target.closest('#ndRun')) return ndCalc();
+  if (ev.target.closest('#ndSaveJson')) {
+    const d = ndSet();
+    return saveFile(
+      d.kind === 'ppac' ? 'detector_PPAC-U238_D' + 2 * d.prs + 'cm_t' + d.ptg + 'ugcm2.json' : 'detector_' + d.mat + '_D' + d.D + 'cm_t' + d.T + 'cm.json',
+      ndToJson(),
+      'JSON',
+      '#ndMsg'
+    );
+  }
+  if (ev.target.closest('#ndLoadJson')) return $('#ndLoadFile').click();
   for (const k of ['e', 'd', 'r', 'h']) {
     if (ev.target.closest('[data-' + k + 'gzr]')) {
       ND.pl[k].z = {};
@@ -726,6 +1098,11 @@ document.addEventListener('change', ev => {
     const d = ndSet(),
       k = t.dataset.dk;
     d[k] = k === 'ia' ? +t.value : t.value;
+    if (k === 'kind') {
+      saveLocal();
+      ND.ph = null;
+      return ndRefreshWin();
+    }
     if (k === 'mat') {
       d.rho = ND_MAT[t.value].rho;
       d.hc = ND_MAT[t.value].hc;
@@ -750,4 +1127,30 @@ document.addEventListener('change', ev => {
       return ndPlot(k);
     }
   }
+});
+
+document.addEventListener('change', ev => {
+  if (ev.target.id !== 'ndLoadFile') return;
+  const f = ev.target.files[0];
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    const m = $('#ndMsg');
+    try {
+      const hasCurve = ndFromJson(String(r.result));
+      ndRefreshWin();
+      if (m)
+        m.textContent = hasCurve
+          ? 'Detector and efficiency curve loaded from ' + f.name + '.'
+          : 'Detector settings loaded from ' + f.name + ' (no efficiency curve in the file: press Calculate efficiency).';
+    } catch (e) {
+      if (m) m.textContent = 'Could not load the detector file: ' + e.message;
+    }
+    ev.target.value = '';
+  };
+  r.onerror = () => {
+    const m = $('#ndMsg');
+    if (m) m.textContent = 'Could not read the file.';
+  };
+  r.readAsText(f);
 });

@@ -1,8 +1,8 @@
 // Neutron detector: cross sections, kinematics, ENDF reader, Monte Carlo efficiency checks
 const fs = require('fs'), vm = require('vm'), path = require('path'), assert = require('assert');
 const ui = f => fs.readFileSync(path.join(__dirname, '../src/ui', f), 'utf8');
-vm.runInThisContext([ui('43-endf.js'), ui('46-secondaries.js'), ui('51-nd-data.js'), ui('52-nd-engine.js')].join('\n') +
-  ';globalThis.A={ndTof,ndEfromT,ndNpXs,ndSetup,ndEff,ndKin,ND_MAT,ND_LP,ndInvLp,ndLp,ndParseN,ndChannelsC,ndMedium,ndSampleMu,ndRng,ndPulse,ndAtoms,ndEmb,tab1Eval,d2Eval,ndSmear};');
+vm.runInThisContext([ui('43-endf.js'), ui('46-secondaries.js'), ui('51-nd-data.js'), ui('51-nd-data-u.js'), ui('52-nd-engine.js')].join('\n') +
+  ';globalThis.A={ndTof,ndEfromT,ndNpXs,ndSetup,ndEff,ndKin,ND_MAT,ND_LP,ndInvLp,ndLp,ndParseN,ndChannelsC,ndMedium,ndSampleMu,ndRng,ndPulse,ndAtoms,ndEmb,tab1Eval,d2Eval,ndSmear,ndPile,ppacSigma,ppacEta,ppacSetup,ndEff};');
 const A = globalThis.A;
 const near = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, msg + ': ' + a + ' vs ' + b);
 // n-p cross section (ENDF/B-VIII.0: 4.26 b at 1 MeV, 0.689 b at 14 MeV)
@@ -76,4 +76,34 @@ console.log('neutron detector: all checks passed');
   assert.strictEqual(A.ndSmear(2, 0, rng), 2, 'resolution 0 leaves the light unchanged');
   assert.strictEqual(A.ndSetup({ mat: 'BC501A', D: 10, T: 10, th: 100, res: 20, rho: 0.874, hc: 1.212, lp: {}, Lm: 25 }, null).res, 0.2);
   console.log('light resolution ok');
+}
+
+// PPAC with a U-238 target
+{
+  near(A.ppacSigma(14.1), 1.14, 0.03, 'U-238(n,f) at 14.1 MeV (JENDL-5)'); near(A.ppacSigma(5), 0.55, 0.05, 'U-238(n,f) at 5 MeV'); near(A.ppacSigma(100), 1.34, 0.05, 'U-238(n,f) at 100 MeV: the evaluation extends beyond 20 MeV');
+  assert.ok(A.ppacSigma(0.5) < 1e-3 && A.ppacSigma(30) > 1.5 && A.ppacSigma(250) === A.ppacSigma(300), 'sub-threshold and constant above the end of the evaluation (195.6 MeV)');
+  const P = (tg, range, mode, rad) => ({ rs: 1, tg, range, dist: 3, rad, eff: 1, mode });
+  // thin layer, huge PPAC: every fragment leaves and hits
+  near(A.ppacEta(P(1, 1e6, 'both', 1e4), 20000, 1).eta, 1, 1e-3, 'thin target, coincidence (only grazing fragments, |cos| < 3e-4, miss)');
+  // layer as thick as the range: both escape with probability 1/4, at least one with 3/4 (|cos| > max(u, 1-u), |cos| > min(u, 1-u))
+  near(A.ppacEta(P(1000, 1000, 'both', 1e4), 400000, 2).eta, 0.25, 0.004, 'both fragments, t = range');
+  near(A.ppacEta(P(1000, 1000, 'any', 1e4), 400000, 3).eta, 0.75, 0.004, 'one fragment, t = range');
+  // small PPAC: the acceptance falls with the distance; PPAC efficiency scales as e^2 (both) 
+  const etaA = A.ppacEta({ rs: 0.01, tg: 1, range: 1e6, dist: 5, rad: 5, eff: 1, mode: 'both' }, 400000, 4).eta;
+  near(etaA, 1 - Math.cos(Math.atan(1)) , 0.01, 'both fragments within 45 degrees: cos(45 deg) = ' + etaA);
+  const eta5 = A.ppacEta({ ...P(1, 1e6, 'both', 1e4), eff: 0.5 }, 200000, 5).eta; near(eta5, 0.25, 0.004, 'efficiency per fragment squared');
+  const S = A.ndSetup({ kind: 'ppac', prs: 1, ptg: 500, prg: 10000, pdist: 3, prad: 4, peff: 100, pmode: 'both', pN: 100000, Lm: 25 }, null);
+  const r = A.ndEff(S, 14.1, 0, 0, 0); near(r.eps, S.eta * (1 - Math.exp(-S.n * 1e-24 * A.ppacSigma(14.1))), 1e-12, 'efficiency = eta x fission probability'); near(S.n / 500, 2.5297e15, 1e12, 'U-238 atoms per ug/cm2');
+  { // default PPAC (298 ug/cm2, spot radius 2 cm, PPAC radius 5 cm at 2.5 cm, single-fragment mode) detects ~60 % of the fissions
+    const r = A.ppacEta({ rs: 2, tg: 298, range: 10000, dist: 2.5, rad: 5, eff: 1, mode: 'any' }, 400000, 11);
+    near(r.eta, 0.60, 0.01, 'default PPAC eta');
+  }
+  console.log('PPAC ok');
+  { // pile-up model
+    const a = A.ndPile(1e6, 100, 'par'), b = A.ndPile(1e6, 100, 'non'), c = A.ndPile(1e6, 100, 'off'), z = A.ndPile(0, 100, 'par');
+    near(a.mu, 0.1, 1e-12, 'n tau'); near(a.loss, 1 - Math.exp(-0.2), 1e-12, 'paralysable loss'); near(a.rec, 1e6 * Math.exp(-0.2), 1e-6, 'paralysable recorded');
+    near(b.loss, 0.1 / 1.1, 1e-12, 'non-paralysable loss'); near(b.rec, 1e6 / 1.1, 1e-6, 'non-paralysable recorded');
+    assert.strictEqual(c.loss, 0); assert.strictEqual(z.loss, 0); assert.strictEqual(A.ndPile(1e6, 0, 'par').loss, 0);
+    console.log('pile-up ok');
+  }
 }

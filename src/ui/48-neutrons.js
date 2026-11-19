@@ -12,11 +12,25 @@ const NEU_DEF = {
   L: 25,
   dt: 3,
   qty: 'rate',
+  emin: 0,
+  emu: 'MeV',
   nyl: 'log',
   nxl: 'lin',
   vyl: 'lin',
   vxl: 'lin'
 };
+// neutron energy threshold of the emitted neutrons: value in the chosen unit → MeV
+const NEU_EU = { eV: 1e-6, keV: 1e-3, MeV: 1 };
+const neuEmin = s => (+s.emin > 0 ? +s.emin * (NEU_EU[s.emu] || 1) : 0);
+// the spectra of a neuCompute result without the neutrons below Emin (MeV): a bin is kept in proportion to the part of it above Emin; W is scaled with the kept fraction
+function neuMask(c, Emin) {
+  if (!(Emin > 0)) return c;
+  const dE = c.Eo / c.nbo,
+    w = Float64Array.from({ length: c.nbo }, (_, j) => Math.min(1, Math.max(0, ((j + 1) * dE - Emin) / dE))),
+    cut = a => Float64Array.from(a, (v, j) => v * w[j]),
+    sum = a => a.reduce((t, v) => t + v, 0);
+  return { ...c, ang: c.ang.map(cut), tot: cut(c.tot), W: c.W * (sum(c.tot) > 0 ? sum(cut(c.tot)) / sum(c.tot) : 0) };
+}
 const NEU_MC2 = 939.56542,
   NEU_C = 0.299792458; // neutron rest energy (MeV), speed of light (m/ns)
 // time of flight (ns) and |dE/dt| (MeV/ns) of a neutron of kinetic energy E (MeV) over L metres; sigma_E of a time resolution st (ns, 1 sigma)
@@ -229,13 +243,24 @@ function neuRender() {
       fld('Layer', sel('lay', layOpts())) +
       '</div>' +
       '<div class="row3">' +
-      '<div class="fld"><span>Flight path, time resolution, detector efficiency</span><div class="btns" style="margin:0"><button class="btn pri" data-ndopen style="font-weight:700;padding:8px 14px">Configure neutron detector</button></div></div>' +
+      '<div class="fld"><span>Flight path, time resolution, detector efficiency</span><div class="btns" style="margin:0"><button class="btn pri" data-ndopen style="font-weight:700;padding:8px 14px">Configure n-detector &amp; DAQ</button></div></div>' +
       fld(
         'Quantity in the plots',
         sel('qty', [
           ['rate', 'Neutron rate, n/s/sr'],
           ['tot', 'Total number of neutrons produced, n/sr'],
           ['perq', 'Neutrons per unit of charge, n/sr/μC (= n/s/sr per μA)']
+        ])
+      ) +
+      '</div>' +
+      '<div class="row3">' +
+      fld('Neutron energy threshold (emitted neutrons; 0 = none)', nI('emin', 'min="0"')) +
+      fld(
+        'Energy unit',
+        sel('emu', [
+          ['eV', 'eV'],
+          ['keV', 'keV'],
+          ['MeV', 'MeV']
         ])
       ) +
       '</div>' +
@@ -341,9 +366,17 @@ async function neuCalc(my) {
   }
   const grid = neuGrid(L7),
     gdeg = grid.map(m => neuR6(neuDeg(m))),
-    cs = neuCompute(F, layers, angs, Eo, nbo),
-    cg = neuCompute(F, layers, gdeg, Eo, nbo);
+    Emin = neuEmin(s),
+    csAll = neuCompute(F, layers, angs, Eo, nbo), // without the energy threshold (the detector window does not use it)
+    cs = neuMask(csAll, Emin),
+    cg = neuMask(neuCompute(F, layers, gdeg, Eo, nbo), Emin);
   if (my !== NEU.gen) return;
+  if (!(cs.W > 0) && Emin > 0 && neuCompute(F, layers, angs, Eo, nbo).W > 0) {
+    NEU.res = null;
+    box.innerHTML =
+      '<p class="hint">No neutron is emitted above the energy threshold of ' + fmt(Emin, 4) + ' MeV (the neutrons reach at most ' + fmt(Eo, 4) + ' MeV).</p>';
+    return;
+  }
   if (!(cs.W > 0)) {
     NEU.res = null;
     box.innerHTML =
@@ -371,7 +404,7 @@ async function neuCalc(my) {
   let i4 = 0;
   for (let i = 1; i < grid.length; i++) i4 += 0.5 * (Yg[i] + Yg[i - 1]) * (grid[i] - grid[i - 1]);
   i4 *= 2 * Math.PI;
-  NEU.res = { angs, L7, sc, cs, cg, grid, gdeg, Yg, tot4, i4, Eo, nbo, layers, ysr, meanE, key: s.qty };
+  NEU.res = { angs, L7, sc, cs, csAll, cg, grid, gdeg, Yg, tot4, i4, Eo, nbo, layers, ysr, meanE, key: s.qty };
   neuShow();
 }
 // table + plots from NEU.res (cheap: redone when the quantity or the current changes)
@@ -408,7 +441,13 @@ function neuShow() {
       .join('');
   neuPrep();
   box.innerHTML =
-    '<p class="hint"><b>Per steradian at the angles chosen above.</b> Rate = n/s/sr; total = n/sr over the whole irradiation (rate × irradiation time); per charge = n/sr/μC (identical to n/s/sr per μA of beam). The “4π” row integrates over all directions.</p>' +
+    '<p class="hint">' +
+    (neuEmin(neuSet()) > 0
+      ? '<b>Only the neutrons above the energy threshold of ' +
+        fmt(neuEmin(neuSet()), 4) +
+        ' MeV are included</b> in the spectra, yields, mean energies and detector results. '
+      : '') +
+    '<b>Per steradian at the angles chosen above.</b> Rate = n/s/sr; total = n/sr over the whole irradiation (rate × irradiation time); per charge = n/sr/μC (identical to n/s/sr per μA of beam). The “4π” row integrates over all directions.</p>' +
     '<div class="tscroll"><table class="t"><tr><th>θ lab (°)</th><th>cos θ</th><th>Angular data</th><th>n s⁻¹ sr⁻¹</th><th>n sr⁻¹</th><th>n sr⁻¹ μC⁻¹</th><th>n sr⁻¹ per ion</th><th>⟨E<sub>n</sub>⟩ (MeV)</th></tr>' +
     rows +
     '<tr><td><b>4π, all angles</b></td><td></td><td></td><td>' +
@@ -574,7 +613,7 @@ function neuPrepDet(r, s, f, q, beam, edges, last) {
     tof,
     xlabel: tof ? 'Time of flight over ' + fmt(Lp, 4) + ' m (ns)' : 'Neutron energy (MeV)',
     ylabel: 'Detected neutrons (' + un[0] + (tof ? ' ns⁻¹' : ' MeV⁻¹') + ')',
-    title: 'Neutrons detected · ' + ND_MAT[ndSet().mat].name + ' Ø' + ndSet().D + ' × ' + ndSet().T + ' cm · ' + beam,
+    title: 'Neutrons detected · ' + ndLabel() + ' · ' + beam,
     stats: [
       'Bins: ' +
         r.nbo +
@@ -615,7 +654,8 @@ function neuStatHtml() {
         Rt = nr * eps,
         mc = R && R.p > 0 ? R.sp / R.p : null,
         c = sc.okI && sc.okT,
-        sN = Math.sqrt(Math.max(N, 0));
+        sN = Math.sqrt(Math.max(N, 0)),
+        pu = sc.okI ? ndPile(Rt, ndSet().tau, ndSet().pu) : null;
       return (
         '<tr><td>' +
         fmt(a, 6) +
@@ -623,8 +663,6 @@ function neuStatHtml() {
         fmt(ysr, 5) +
         '</td><td>' +
         (c ? fmt(nc, 5) : '–') +
-        '</td><td>' +
-        (sc.okI ? fmt(nr, 5) : '–') +
         '</td><td>' +
         (c ? fmt(N, 5) : '–') +
         '</td><td>' +
@@ -637,6 +675,12 @@ function neuStatHtml() {
         (c ? '± ' + fmt(sN / T, 3) : '–') +
         '</td><td>' +
         (sc.okI ? '± ' + f2(mc === null ? null : Rt * mc, 3) : '–') +
+        '</td><td' +
+        (pu && pu.loss > 0.1 ? ' style="color:var(--bad);font-weight:700"' : pu && pu.loss > 0.01 ? ' style="color:var(--warn)"' : '') +
+        '>' +
+        (pu ? (ndSet().pu === 'off' ? 'off' : fmt(100 * pu.loss, 3) + ' % (nτ = ' + fmt(pu.mu, 2) + ')') : '–') +
+        '</td><td>' +
+        (pu ? fmt(pu.rec, 5) : '–') +
         '</td><td>' +
         fmt((eps * D.om) / (4 * Math.PI), 4) +
         (R ? ' ± ' + fmt((R.sp * D.om) / (4 * Math.PI), 2) : '') +
@@ -648,29 +692,31 @@ function neuStatHtml() {
     '<p class="hint">' +
     'All numbers are for the detector placed at the flight-path distance L = ' +
     fmt(+neuSet().L > 0 ? +neuSet().L : 25, 4) +
-    ' m from the neutron source (front face on the axis, source in the direction θ, cylinder ' +
-    fmt(ND.eff.S.geo.R * 2, 4) +
-    ' × ' +
-    fmt(ND.eff.S.geo.T, 4) +
-    ' cm): the neutrons reaching the detector are the yield per sr at θ × the solid angle of the front face, ω = ' +
+    ' m from the neutron source (' +
+    (ND.eff.S.ppac
+      ? 'U-238 deposit on the axis, source in the direction θ, beam spot Ø' + fmt(ND.eff.S.geo.R * 2, 4) + ' cm'
+      : 'front face on the axis, source in the direction θ, cylinder ' + fmt(ND.eff.S.geo.R * 2, 4) + ' × ' + fmt(ND.eff.S.geo.T, 4) + ' cm') +
+    '): the neutrons reaching the detector are the yield per sr at θ × the solid angle of the ' +
+    (ND.eff.S.ppac ? 'beam spot' : 'front face') +
+    ', ω = ' +
     fmt(D.om, 4) +
     ' sr. ' +
-    (sc.okI
-      ? 'Ion rate = ' +
-        fmt(sc.rate, 5) +
-        ' s⁻¹ (beam current / (charge state × e)); neutron rate on the detector = ion rate × Y(θ) × ω; count rate = that × intrinsic efficiency. '
-      : '') +
+    (sc.okI ? 'Ion rate = ' + fmt(sc.rate, 5) + ' s⁻¹ (beam current / (charge state × e)); count rate = ion rate × Y(θ) × ω × intrinsic efficiency. ' : '') +
     (T
       ? 'Irradiation time T = ' + fmt(T, 5) + ' s. '
       : 'Enter the beam current and the irradiation time to get the counts and the statistical uncertainty of the rate. ') +
     'Statistical = Poisson √N of the detected counts (√N / T for the rate): the uncertainty a real measurement would have. Monte Carlo = uncertainty of the efficiency calculation (' +
     (ph ? ph[0].N : '…') +
-    ' histories per angle), reduced by running more histories. Total efficiency ε<sub>tot</sub> = detected counts / neutrons emitted into 4π at the same yield = intrinsic efficiency × ω / 4π, with ω = ' +
+    ' histories per angle), reduced by running more histories. Pile-up level = fraction of the detected events lost at the rate n above (pulse width τ = ' +
+    fmt(+ndSet().tau, 4) +
+    ' ns, ' +
+    (ndSet().pu === 'non' ? 'non-paralysable: n/(1 + nτ)' : ndSet().pu === 'off' ? 'model off' : 'paralysable, ±τ window: n·exp(−2nτ)') +
+    '; set in the DAQ section of the detector window; red above 10 %, orange above 1 %); the count rate after pile-up is n × (1 − level). Total efficiency ε<sub>tot</sub> = detected counts / neutrons emitted into 4π at the same yield = intrinsic efficiency × ω / 4π, with ω = ' +
     fmt(D.om, 4) +
     ' sr the solid angle of the front face (mean intrinsic efficiencies: ' +
     r.angs.map((a, i) => 'θ = ' + fmt(a, 5) + '°: ' + fmt(ph ? ndRatio(ph[i]).p : 0, 4)).join(', ') +
     ').</p>' +
-    '<div class="tscroll"><table class="t"><tr><th>θ lab (°)</th><th>Yield Y(θ) (n sr⁻¹ per ion)</th><th>Neutrons reaching the detector</th><th>Neutron rate on the detector (s⁻¹)</th><th>Detected counts N</th><th>± statistical</th><th>± Monte Carlo</th><th>Count rate (s⁻¹)</th><th>± statistical</th><th>± Monte Carlo</th><th>Total efficiency ε<sub>tot</sub></th></tr>' +
+    '<div class="tscroll"><table class="t"><tr><th>θ lab (°)</th><th>Yield Y(θ) (n sr⁻¹ per ion)</th><th>Neutrons reaching the detector</th><th>Detected counts N</th><th>± statistical</th><th>± Monte Carlo</th><th>Count rate (s⁻¹)</th><th>± statistical</th><th>± Monte Carlo</th><th>Pile-up level</th><th>Count rate after pile-up (s⁻¹)</th><th>Total efficiency ε<sub>tot</sub></th></tr>' +
     rows +
     '</table></div>'
   );
@@ -681,7 +727,7 @@ function neuDetRefresh() {
   box.innerHTML = neuStatHtml();
   const ph = NEU.phc && NEU.phc.list,
     r = NEU.res;
-  if (!ph) return;
+  if (!ph || ph[0].ppac) return; // the PPAC has no pulse height
   const D = NEU.det,
     s = neuSet(),
     qk = NEU_QTY[s.qty] ? s.qty : 'rate',
@@ -707,7 +753,7 @@ function neuDetRefresh() {
     series,
     xlabel: 'Light output (MeVee)',
     ylabel: 'Detected neutrons (' + D.un[0] + ' MeVee⁻¹)',
-    title: 'Pulse-height spectra · ' + ND_MAT[ndSet().mat].name + ' Ø' + ndSet().D + ' × ' + ndSet().T + ' cm',
+    title: 'Pulse-height spectra · ' + ndLabel(),
     stats: [
       'Bins: ' +
         ph[0].nb +
@@ -752,7 +798,7 @@ function neuDetHtml() {
   if (!D)
     return (
       h +
-      '<p class="hint">Open <i>Configure neutron detector</i> and press <i>Calculate efficiency</i>: this plot then shows the spectra of each angle corrected by the intrinsic efficiency and the solid angle of the detector, so that their integral is the total number of neutrons detected.</p>'
+      '<p class="hint">Open <i>Configure n-detector &amp; DAQ</i> and press <i>Calculate efficiency</i>: this plot then shows the spectra of each angle corrected by the intrinsic efficiency and the solid angle of the detector, so that their integral is the total number of neutrons detected.</p>'
     );
   h +=
     '<div class="pcbar"><label class="pc-sel"><span>Distribution</span><select data-neudist><option value="E"' +
@@ -760,10 +806,16 @@ function neuDetHtml() {
     '>Neutron energy</option><option value="t"' +
     (d.dist === 't' ? ' selected' : '') +
     '>Time of flight</option></select></label>' +
-    '<span class="hint">Intrinsic efficiency = events above the threshold / neutrons entering the front face (the solid angle is applied separately: ' +
+    '<span class="hint">Intrinsic efficiency = ' +
+    (ND.eff && ND.eff.S && ND.eff.S.ppac
+      ? 'detected fission events / neutrons on the target spot'
+      : 'events above the threshold / neutrons entering the front face') +
+    ' (the solid angle is applied separately: ' +
     fmt(D.om, 3) +
     ' sr).</span></div><div id="neuP_w"></div>' +
-    '<h3 class="sub">Pulse-height spectra of the detected neutrons</h3><div id="neuP_p"><p class="hint">Monte Carlo of the pulse height at every angle running…</p></div>' +
+    (ND.eff && ND.eff.S && ND.eff.S.ppac
+      ? ''
+      : '<h3 class="sub">Pulse-height spectra of the detected neutrons</h3><div id="neuP_p"><p class="hint">Monte Carlo of the pulse height at every angle running…</p></div>') +
     '<h3 class="sub">Counting statistics</h3><div id="neuStat"></div>';
   return h;
 }

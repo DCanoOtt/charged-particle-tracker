@@ -331,6 +331,8 @@ with sync_playwright() as p:
     rc2 = pg.evaluate(JS_RC)
     check('neutron card: number of bins selectable (40) and Poisson sampling can be switched off (area = expected value)', (not rc2['none']) and rc2['nb'] == 40 and all(abs(rc2['area'][i] - rc2['areaE'][i]) <= 1e-6 * rc2['exp'][i] + 1e-9 for i in range(rc2['n'])), rc2)
     pg.click('#cNeu [data-neur=rfl]'); pg.fill('#cNeu [data-neur=rnb]', ''); pg.wait_for_timeout(700)
+    et = pg.evaluate("""()=>{const rr=$$('#neuStat table.t tr').slice(1); const sc=NEU.res.sc; return rr.map(r=>{const c=[...r.cells].map(x=>parseFloat(x.textContent)); const rate=c[6], etot=c[c.length-1]; return {rate, etot, exp: rate/(sc.rate*NEU.res.tot4All)}})}""")
+    check('neutron card: total efficiency = detected / all neutrons emitted into 4 pi (rate / (ion rate x total yield))', len(et) > 1 and all(abs(e['etot'] - e['exp']) <= 2e-3 * e['exp'] + 1e-15 for e in et), et[:3])
     check('neutron card: both tables (per steradian, counting statistics) have PNG / PDF / Excel / CSV buttons; CSV, xlsx and canvas builders work', tx['ids'] == ['neu_sr', 'neu_stat'] and all(b == 'png,pdf,xlsx,csv' for b in tx['btns']) and tx['csvLines'] == tx['nrow'] and tx['xlsxZip'] and tx['cvOk'] and tx['num'], tx)
     check('neutron card: Counting statistics table (counts and rate, statistical and Monte Carlo uncertainty), pulse-height spectra below the detected-neutron plot, bins and integrals in the plot info boxes',
           'Counting statistics' in cs['h'] and cs['hasMC'] and cs['pileCol'] and cs['rows'] >= 3 and cs['pulse'] and cs['np'] >= 1 and cs['bins'] and cs['nbins'] and 0.99 < cs['ratio'] < 50, cs)

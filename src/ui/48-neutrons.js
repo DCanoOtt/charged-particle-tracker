@@ -369,13 +369,14 @@ async function neuCalc(my) {
       }
       return d > 0 ? n / d : 0;
     },
-    tot4 = cs.tot.reduce((t, v) => t + v, 0) * dE;
+    tot4 = cs.tot.reduce((t, v) => t + v, 0) * dE,
+    tot4All = csAll.tot.reduce((t, v) => t + v, 0) * dE; // all neutrons emitted into 4π (without the energy threshold of the card)
   // 4π integral of the plotted distribution (trapezoids in cos θ) as a consistency check against the energy-integrated total
   const Yg = cg.ang.map(ysr);
   let i4 = 0;
   for (let i = 1; i < grid.length; i++) i4 += 0.5 * (Yg[i] + Yg[i - 1]) * (grid[i] - grid[i - 1]);
   i4 *= 2 * Math.PI;
-  NEU.res = { angs, L7, sc, cs, csAll, cg, grid, gdeg, Yg, tot4, i4, Eo, nbo, layers, ysr, meanE, key: s.qty };
+  NEU.res = { angs, L7, sc, cs, csAll, cg, grid, gdeg, Yg, tot4, tot4All, i4, Eo, nbo, layers, ysr, meanE, key: s.qty };
   neuShow();
 }
 // table + plots from NEU.res (cheap: redone when the quantity or the current changes)
@@ -843,8 +844,7 @@ function neuStatHtml() {
         '</td><td>' +
         (pu ? fmt(pu.rec, 5) : '–') +
         '</td><td>' +
-        fmt((eps * D.om) / (4 * Math.PI), 4) +
-        (R ? ' ± ' + fmt((R.sp * D.om) / (4 * Math.PI), 2) : '') +
+        (r.tot4All > 0 ? fmt((eps * D.om * ysr) / r.tot4All, 4) + (R ? ' ± ' + fmt((R.sp * D.om * ysr) / r.tot4All, 2) : '') : '–') +
         '</td></tr>'
       );
     })
@@ -878,7 +878,9 @@ function neuStatHtml() {
     fmt(+ndSet().tau, 4) +
     ' ns, ' +
     (ndSet().pu === 'non' ? 'non-paralysable: n/(1 + nτ)' : ndSet().pu === 'off' ? 'model off' : 'paralysable, ±τ window: n·exp(−2nτ)') +
-    '; set in the DAQ section of the detector window; red above 10 %, orange above 1 %); the count rate after pile-up is n × (1 − level). Total efficiency ε<sub>tot</sub> = detected counts / neutrons emitted into 4π at the same yield = intrinsic efficiency × ω / 4π, with ω = ' +
+    '; set in the DAQ section of the detector window; red above 10 %, orange above 1 %); the count rate after pile-up is n × (1 − level). Total efficiency ε<sub>tot</sub> = detected counts / all neutrons emitted into 4π (' +
+    fmt(r.tot4All, 4) +
+    ' n per ion, without the energy threshold of the card) = intrinsic efficiency × ω × Y(θ) / Y<sub>4π</sub>, so it contains the angular distribution of the emission; with ω = ' +
     fmt(D.om, 4) +
     ' sr the solid angle of the front face (mean intrinsic efficiencies: ' +
     r.angs.map((a, i) => 'θ = ' + fmt(a, 5) + '°: ' + fmt(ph ? ndRatio(ph[i]).p : 0, 4)).join(', ') +
